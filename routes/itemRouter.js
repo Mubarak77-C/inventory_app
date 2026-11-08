@@ -4,7 +4,10 @@ const itemController = require("../controllers/itemController");
 
 const router = Router();
 
-// GET request to /items/ gets handled by getItemsList controller
+// GET /items/ -> Fetch all items
 router.get("/", itemController.getItemsList);
+
+// POST /items/ -> Create a new item
+router.post("/", itemController.createItem);
 
 module.exports = router;

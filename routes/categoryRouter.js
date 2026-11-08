@@ -10,4 +10,7 @@ router.get("/", categoryController.getCategoriesList);
 // POST /categories/ -> Create a new category
 router.post("/", categoryController.createCategory);
 
+// GET /categories/:id/items -> Fetch items belonging to a specific category ID
+router.get("/:id/items", categoryController.getCategoryItems);
+
 module.exports = router;

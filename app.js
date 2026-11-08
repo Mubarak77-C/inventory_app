@@ -4,6 +4,7 @@ const path = require("path");
 require("dotenv").config();
 
 const itemRouter = require("./routes/itemRouter");
+const categoryRouter = require("./routes/categoryRouter");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,7 +16,7 @@ app.use(express.json());
 // Mount Routers
 // Any request starting with /items will go to itemRouter
 app.use("/items", itemRouter);
-
+app.use("/categories", categoryRouter);
 // Root route fallback
 app.get("/", (req, res) => {
   res.send(

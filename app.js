@@ -25,6 +25,20 @@ app.get("/", async (req, res) => {
   }
 });
 
+// Quick test route to fetch items from PostgreSQL
+app.get("/", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM items");
+    res.status(200).json({
+      message: "Database connected and items fetched successfully!",
+      items: rows,
+    });
+  } catch (err) {
+    console.error("Query execution error:", err);
+    res.status(500).send("Server error while querying database.");
+  }
+});
+
 // Start server listener
 app.listen(PORT, () => {
   console.log(`Inventory app listening on http://localhost:${PORT}`);

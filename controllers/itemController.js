@@ -4,14 +4,12 @@ const itemModel = require("../models/itemModel");
 async function getItemsList(req, res) {
   try {
     const items = await itemModel.getAllItems();
-    res.status(200).json({
-      success: true,
-      count: items.length,
-      items: items,
-    });
+
+    // Render the 'index.ejs' file and pass the items array into it
+    res.render("index", { items });
   } catch (err) {
     console.error("Error in itemController (GET):", err);
-    res.status(500).json({ success: false, error: "Internal Server Error" });
+    res.status(500).send("Internal Server Error");
   }
 }
 

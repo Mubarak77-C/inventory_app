@@ -59,33 +59,33 @@
   </head>
   <body>
     <div class="form-container">
-      <h1>📦 Add New Item</h1>
-      <!-- Form submits via POST to /items -->
-      <form action="/items" method="POST">
-        <label for="name">Item Name:</label>
-        <input type="text" id="name" name="name" required />
+        <!-- views/newItem.ejs -->
+<%- include('partials/header', { title: 'Add New Item' }) %>
 
-        <label for="description">Description:</label>
-        <textarea id="description" name="description" rows="3"></textarea>
+<h1>📦 Add New Item</h1>
+<form action="/items" method="POST">
+  <label for="name">Item Name:</label>
+  <input type="text" id="name" name="name" required>
 
-        <label for="category_id">Category ID:</label>
-        <input type="number" id="category_id" name="category_id" required />
+  <label for="description">Description:</label>
+  <textarea id="description" name="description" rows="3"></textarea>
 
-        <label for="price">Price ($):</label>
-        <input type="number" step="0.01" id="price" name="price" required />
+  <label for="category_id">Category ID:</label>
+  <input type="number" id="category_id" name="category_id" required>
 
-        <label for="stock_count">Stock Count:</label>
-        <input
-          type="number"
-          id="stock_count"
-          name="stock_count"
-          value="0"
-          required
-        />
+  <label for="price">Price ($):</label>
+  <input type="number" step="0.01" id="price" name="price" required>
 
-        <button type="submit">Save Item</button>
-      </form>
-      <a href="/items">← Back to Inventory</a>
+  <label for="stock_count">Stock Count:</label>
+  <input type="number" id="stock_count" name="stock_count" value="0" required>
+
+  <button type="submit">Save Item</button>
+</form>
+
+<a href="/items" style="display: inline-block; margin-top: 15px; color: #3498db; text-decoration: none;">← Back to Inventory</a>
+
+<%- include('partials/footer') %>
+     
     </div>
   </body>
 </html>

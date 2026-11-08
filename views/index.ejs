@@ -15,39 +15,40 @@
   </style>
 </head>
 <body>
-  <h1>📦 Restaurant & Store Inventory</h1>
-  <p>Welcome to your operational dashboard.</p>
+ <%- include('partials/header', { title: 'Inventory Dashboard' }) %>
 
-  <h2>Current Inventory Items</h2>
-  <% if (items && items.length > 0) { %>
-    <!-- Inside views/index.ejs, right above your table -->
-<div style="margin-bottom: 20px;">
-  <a href="/items/new" style="background: #27ae60; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;">+ Add New Item</a>
-</div>
-    <table>
-      <thead>
+<h1>📦 Restaurant & Store Inventory</h1>
+<p>Welcome to your operational dashboard.</p>
+
+<a href="/items/new" class="btn">+ Add New Item</a>
+
+<% if (items && items.length > 0) { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Category ID</th>
+        <th>Price</th>
+        <th>Stock</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% items.forEach(item => { %>
         <tr>
-          <th>Name</th>
-          <th>Description</th>
-          <th>Category ID</th>
-          <th>Price</th>
-          <th>Stock</th>
+          <td><strong><%= item.name %></strong></td>
+          <td><%= item.description || 'No description' %></td>
+          <td><%= item.category_id %></td>
+          <td>$<%= item.price %></td>
+          <td><%= item.stock_count %></td>
         </tr>
-      </thead>
-      <tbody>
-        <% items.forEach(item => { %>
-          <tr>
-            <td><strong><%= item.name %></strong></td>
-            <td><%= item.description || 'No description' %></td>
-            <td><%= item.category_id %></td>
-            <td>$<%= item.price %></td>
-            <td><%= item.stock_count %></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  <%  } else { %>
-    <p>No items found in inventory.</p>
-  <% } %>
+      <% }) %>
+    </tbody>
+  </table>
+<% } else { %>
+  <p>No items found in inventory.</p>
+<% } %>
+
+<%- include('partials/footer') %>
 </body>
 </html>

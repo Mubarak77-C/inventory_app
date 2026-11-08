@@ -49,7 +49,68 @@ async function createItem(req, res) {
   }
 }
 
+// controllers/itemController.js (add to existing functions and exports)
+
+async function updateItem(req, res) {
+  try {
+    const { id } = req.params;
+    const { name, description, category_id, price, stock_count } = req.body;
+
+    if (!name || !category_id || !price) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Missing required fields: name, category_id, and price are required.",
+      });
+    }
+
+    const updatedItem = await itemModel.updateItem(
+      id,
+      name,
+      description || null,
+      category_id,
+      price,
+      stock_count || 0,
+    );
+
+    if (!updatedItem) {
+      return res.status(404).json({ success: false, error: "Item not found." });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Item updated successfully!",
+      item: updatedItem,
+    });
+  } catch (err) {
+    console.error("Error in itemController (PUT):", err);
+    res.status(500).json({ success: false, error: "Internal Server Error" });
+  }
+}
+
+async function deleteItem(req, res) {
+  try {
+    const { id } = req.params;
+    const deletedItem = await itemModel.deleteItem(id);
+
+    if (!deletedItem) {
+      return res.status(404).json({ success: false, error: "Item not found." });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Item deleted successfully!",
+      item: deletedItem,
+    });
+  } catch (err) {
+    console.error("Error in itemController (DELETE):", err);
+    res.status(500).json({ success: false, error: "Internal Server Error" });
+  }
+}
+
 module.exports = {
   getItemsList,
   createItem,
+  updateItem, // <-- Export update
+  deleteItem, // <-- Export delete
 };

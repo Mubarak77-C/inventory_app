@@ -25,8 +25,37 @@ async function getItemsByCategory(categoryId) {
   return rows;
 }
 
+// models/itemModel.js (add to existing functions and exports)
+
+async function updateItem(
+  id,
+  name,
+  description,
+  category_id,
+  price,
+  stock_count,
+) {
+  const query = `
+    UPDATE items 
+    SET name = $1, description = $2, category_id = $3, price = $4, stock_count = $5
+    WHERE id = $6
+    RETURNING *;
+  `;
+  const values = [name, description, category_id, price, stock_count, id];
+  const { rows } = await pool.query(query, values);
+  return rows[0]; // Returns undefined if ID doesn't exist
+}
+
+async function deleteItem(id) {
+  const query = "DELETE FROM items WHERE id = $1 RETURNING *;";
+  const { rows } = await pool.query(query, [id]);
+  return rows[0]; // Returns undefined if ID doesn't exist
+}
+
 module.exports = {
   getAllItems,
   insertItem,
-  getItemsByCategory, // <-- Export it here
+  getItemsByCategory,
+  updateItem, // <-- Export update
+  deleteItem, // <-- Export delete
 };

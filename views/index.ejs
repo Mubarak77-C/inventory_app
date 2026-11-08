@@ -20,6 +20,10 @@
 
   <h2>Current Inventory Items</h2>
   <% if (items && items.length > 0) { %>
+    <!-- Inside views/index.ejs, right above your table -->
+<div style="margin-bottom: 20px;">
+  <a href="/items/new" style="background: #27ae60; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;">+ Add New Item</a>
+</div>
     <table>
       <thead>
         <tr>

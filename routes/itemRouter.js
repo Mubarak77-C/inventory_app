@@ -4,16 +4,17 @@ const itemController = require("../controllers/itemController");
 
 const router = Router();
 
-// GET /items/ -> Fetch all items
+// GET /items/new -> Render the form (MUST be above /:id)
+router.get("/new", itemController.renderNewItemForm);
+
+// GET /items/ -> Fetch all items & render dashboard
 router.get("/", itemController.getItemsList);
 
-// POST /items/ -> Create an item
+// POST /items/ -> Handle form submission
 router.post("/", itemController.createItem);
 
-// PUT /items/:id -> Update an item by ID
+// PUT and DELETE routes...
 router.put("/:id", itemController.updateItem);
-
-// DELETE /items/:id -> Delete an item by ID
 router.delete("/:id", itemController.deleteItem);
 
 module.exports = router;

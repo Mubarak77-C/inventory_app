@@ -18,7 +18,15 @@ async function insertItem(name, description, category_id, price, stock_count) {
   return rows[0]; // Return the newly created row
 }
 
+// models/itemModel.js (add this function to your existing exports)
+async function getItemsByCategory(categoryId) {
+  const query = "SELECT * FROM items WHERE category_id = $1;";
+  const { rows } = await pool.query(query, [categoryId]);
+  return rows;
+}
+
 module.exports = {
   getAllItems,
   insertItem,
+  getItemsByCategory, // <-- Export it here
 };

@@ -1,5 +1,6 @@
 // controllers/categoryController.js
 const categoryModel = require("../models/categoryModel");
+const itemModel = require("../models/itemModel"); // <-- Import item model
 
 async function getCategoriesList(req, res) {
   try {
@@ -50,7 +51,37 @@ async function createCategory(req, res) {
   }
 }
 
+// New controller function to fetch items by category ID
+async function getCategoryItems(req, res) {
+  try {
+    const { id } = req.params; // Grabs the category ID from the URL parameter
+
+    // Optional: Fetch category details first to ensure it exists
+    const categories = await categoryModel.getAllCategories();
+    const targetCategory = categories.find((cat) => cat.id === parseInt(id));
+
+    if (!targetCategory) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Category not found." });
+    }
+
+    const items = await itemModel.getItemsByCategory(id);
+
+    res.status(200).json({
+      success: true,
+      category: targetCategory.name,
+      count: items.length,
+      items: items,
+    });
+  } catch (err) {
+    console.error("Error in categoryController (getCategoryItems):", err);
+    res.status(500).json({ success: false, error: "Internal Server Error" });
+  }
+}
+
 module.exports = {
   getCategoriesList,
   createCategory,
+  getCategoryItems, // <-- Export it here
 };

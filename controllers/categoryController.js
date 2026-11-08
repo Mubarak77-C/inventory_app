@@ -64,11 +64,10 @@ async function getCategoryItems(req, res) {
 
     const items = await itemModel.getItemsByCategory(id);
 
-    res.status(200).json({
-      success: true,
-      category: targetCategory.name,
-      count: items.length,
-      items: items,
+    // Render the index view, passing the filtered items and category name
+    res.render("index", {
+      items,
+      title: `${targetCategory.name} Inventory`,
     });
   } catch (err) {
     console.error("Error in categoryController (getCategoryItems):", err);

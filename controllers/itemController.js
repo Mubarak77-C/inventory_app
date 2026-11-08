@@ -106,9 +106,41 @@ async function deleteItem(req, res) {
   }
 }
 
+// controllers/itemController.js (add renderNewItemForm and update createItem)
+
+// Render the HTML form view
+async function renderNewItemForm(req, res) {
+  res.render("newItem");
+}
+
+// Update createItem to redirect after insertion
+async function createItem(req, res) {
+  try {
+    const { name, description, category_id, price, stock_count } = req.body;
+
+    if (!name || !category_id || !price) {
+      return res.status(400).send("Missing required fields.");
+    }
+
+    await itemModel.insertItem(
+      name,
+      description || null,
+      category_id,
+      price,
+      stock_count || 0,
+    );
+    // Redirect user back to the main inventory dashboard
+    res.redirect("/items");
+  } catch (err) {
+    console.error("Error in itemController (POST):", err);
+    res.status(500).send("Internal Server Error");
+  }
+}
+
 module.exports = {
   getItemsList,
+  renderNewItemForm, // <-- Export form renderer
   createItem,
-  updateItem, // <-- Export update
-  deleteItem, // <-- Export delete
+  updateItem,
+  deleteItem,
 };

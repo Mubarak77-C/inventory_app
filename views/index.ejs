@@ -1,0 +1,49 @@
+<!-- views/index.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f9; color: #333; }
+    h1 { color: #2c3e50; }
+    table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background-color: #2c3e50; color: white; }
+    tr:hover { background-color: #f1f1f1; }
+  </style>
+</head>
+<body>
+  <h1>📦 Restaurant & Store Inventory</h1>
+  <p>Welcome to your operational dashboard.</p>
+
+  <h2>Current Inventory Items</h2>
+  <% if (items && items.length > 0) { %>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Category ID</th>
+          <th>Price</th>
+          <th>Stock</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% items.forEach(item => { %>
+          <tr>
+            <td><strong><%= item.name %></strong></td>
+            <td><%= item.description || 'No description' %></td>
+            <td><%= item.category_id %></td>
+            <td>$<%= item.price %></td>
+            <td><%= item.stock_count %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <%  } else { %>
+    <p>No items found in inventory.</p>
+  <% } %>
+</body>
+</html>

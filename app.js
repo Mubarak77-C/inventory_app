@@ -11,19 +11,19 @@ const PORT = process.env.PORT || 3000;
 app.use(express.urlencoded({ extended: true })); // Parses form data (req.body)
 app.use(express.json()); // Parses JSON payloads
 
-// Simple test route to verify DB connection and server flow
-app.get("/", async (req, res) => {
-  try {
-    // Run a quick query to test PostgreSQL connection
-    const result = await pool.query("SELECT NOW()");
-    res
-      .status(200)
-      .send(`Server is running successfully! DB Time: ${result.rows[0].now}`);
-  } catch (err) {
-    console.error("Database connection error:", err);
-    res.status(500).send("Database connection failed. Check your .env file.");
-  }
-});
+// // Simple test route to verify DB connection and server flow
+// app.get("/", async (req, res) => {
+//   try {
+//     // Run a quick query to test PostgreSQL connection
+//     const result = await pool.query("SELECT NOW()");
+//     res
+//       .status(200)
+//       .send(`Server is running successfully! DB Time: ${result.rows[0].now}`);
+//   } catch (err) {
+//     console.error("Database connection error:", err);
+//     res.status(500).send("Database connection failed. Check your .env file.");
+//   }
+// });
 
 // Quick test route to fetch items from PostgreSQL
 app.get("/", async (req, res) => {

@@ -1,5 +1,6 @@
 // controllers/itemController.js
 const itemModel = require("../models/itemModel");
+const categoryModel = require("../models/categoryModel");
 
 async function getItemsList(req, res) {
   try {
@@ -133,6 +134,17 @@ async function createItem(req, res) {
     res.redirect("/items");
   } catch (err) {
     console.error("Error in itemController (POST):", err);
+    res.status(500).send("Internal Server Error");
+  }
+}
+
+// Fetch categories and pass them to the EJS form view
+async function renderNewItemForm(req, res) {
+  try {
+    const categories = await categoryModel.getAllCategories();
+    res.render("newItem", { categories }); // Pass categories array to view
+  } catch (err) {
+    console.error("Error in itemController (renderNewItemForm):", err);
     res.status(500).send("Internal Server Error");
   }
 }

@@ -2,6 +2,17 @@
 const categoryModel = require("../models/categoryModel");
 const itemModel = require("../models/itemModel"); // <-- Import item model
 
+// Render the categories management page
+async function renderCategoriesPage(req, res) {
+  try {
+    const categories = await categoryModel.getAllCategories();
+    res.render("categories", { categories });
+  } catch (err) {
+    console.error("Error in categoryController (renderCategoriesPage):", err);
+    res.status(500).send("Internal Server Error");
+  }
+}
+
 async function getCategoriesList(req, res) {
   try {
     const categories = await categoryModel.getAllCategories();
@@ -16,38 +27,23 @@ async function getCategoriesList(req, res) {
   }
 }
 
+// Handle form submission to create a category and redirect
 async function createCategory(req, res) {
   try {
     const { name, description } = req.body;
 
     if (!name) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required field: category name is required.",
-      });
+      return res.status(400).send("Category name is required.");
     }
 
-    const newCategory = await categoryModel.insertCategory(
-      name,
-      description || null,
-    );
-
-    res.status(201).json({
-      success: true,
-      message: "Category created successfully!",
-      category: newCategory,
-    });
+    await categoryModel.insertCategory(name, description || null);
+    res.redirect("/categories");
   } catch (err) {
-    console.error("Error in categoryController (POST):", err);
-
-    // PostgreSQL unique constraint error code for duplicate names
+    console.error("Error in categoryController (createCategory):", err);
     if (err.code === "23505") {
-      return res
-        .status(400)
-        .json({ success: false, error: "Category name already exists." });
+      return res.status(400).send("Category name already exists.");
     }
-
-    res.status(500).json({ success: false, error: "Internal Server Error" });
+    res.status(500).send("Internal Server Error");
   }
 }
 
@@ -81,7 +77,8 @@ async function getCategoryItems(req, res) {
 }
 
 module.exports = {
-  getCategoriesList,
+  getCategoriesList: renderCategoriesPage, // or keep both
+  renderCategoriesPage,
   createCategory,
-  getCategoryItems, // <-- Export it here
+  getCategoryItems,
 };

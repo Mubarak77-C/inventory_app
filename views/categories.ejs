@@ -1,0 +1,54 @@
+<!-- views/categories.ejs -->
+<%- include('partials/header', { title: 'Category Management' }) %>
+
+<h1>📂 Category Management</h1>
+<p>Organize your operational departments and menu sections.</p>
+
+<div style="display: flex; gap: 30px; margin-top: 30px; flex-wrap: wrap;">
+  
+  <!-- Left Column: Add Category Form -->
+  <div style="flex: 1; min-width: 280px; background: #fafafa; padding: 20px; border-radius: 6px; border: 1px solid #e1e1e8;">
+    <h2>Add New Category</h2>
+    <form action="/categories" method="POST">
+      <label for="name">Category Name:</label>
+      <input type="text" id="name" name="name" placeholder="e.g. Bar & Beverages" required>
+
+      <label for="description">Description:</label>
+      <textarea id="description" name="description" rows="3" placeholder="Brief details about this category..."></textarea>
+
+      <button type="submit" style="width: 100%; margin-top: 15px;">Create Category</button>
+    </form>
+  </div>
+
+  <!-- Right Column: Existing Categories Table -->
+  <div style="flex: 2; min-width: 400px;">
+    <h2>Existing Categories</h2>
+    <% if (categories && categories.length > 0) { %>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Quick Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% categories.forEach(category => { %>
+            <tr>
+              <td><strong><%= category.name %></strong></td>
+              <td><%= category.description || 'No description' %></td>
+              <td>
+                <a href="/categories/<%= category.id %>/items" style="color: #3498db; text-decoration: none; font-weight: bold;">View Items →</a>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } else { %>
+      <p>No categories found. Create your first one on the left!</p>
+    <% } %>
+  </div>
+
+</div>
+
+<%- include('partials/footer') %>

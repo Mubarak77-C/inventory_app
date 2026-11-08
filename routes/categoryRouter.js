@@ -4,10 +4,10 @@ const categoryController = require("../controllers/categoryController");
 
 const router = Router();
 
-// GET /categories/ -> Fetch all categories
-router.get("/", categoryController.getCategoriesList);
+// GET /categories/ -> Render category management dashboard & form
+router.get("/", categoryController.renderCategoriesPage);
 
-// POST /categories/ -> Create a new category
+// POST /categories/ -> Handle new category creation
 router.post("/", categoryController.createCategory);
 
 // GET /categories/:id/items -> Fetch items belonging to a specific category ID

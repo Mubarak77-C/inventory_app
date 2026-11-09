@@ -1,13 +1,23 @@
 // models/itemModel.js
 const pool = require("../db/pool");
 
-async function getAllItems() {
-  const query = `
+// models/itemModel.js
+async function getAllItems(searchTerm = "") {
+  let query = `
     SELECT items.*, categories.name AS category_name 
     FROM items 
-    LEFT JOIN categories ON items.category_id = categories.id;
+    LEFT JOIN categories ON items.category_id = categories.id
   `;
-  const { rows } = await pool.query(query);
+  let params = [];
+
+  if (searchTerm.trim() !== "") {
+    query += ` WHERE items.name ILIKE $1`;
+    params.push(`%${searchTerm}%`);
+  }
+
+  query += ` ORDER BY items.id DESC;`;
+
+  const { rows } = await pool.query(query, params);
   return rows;
 }
 

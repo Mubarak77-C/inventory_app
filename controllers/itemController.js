@@ -2,9 +2,11 @@
 const itemModel = require("../models/itemModel");
 const categoryModel = require("../models/categoryModel");
 
+// controllers/itemController.js
 async function getItemsList(req, res) {
   try {
-    const items = await itemModel.getAllItems();
+    const searchTerm = req.query.search || "";
+    const items = await itemModel.getAllItems(searchTerm);
 
     const totalInventoryValue = items.reduce((sum, item) => {
       return sum + Number(item.price) * Number(item.stock_count || 0);
@@ -13,14 +15,14 @@ async function getItemsList(req, res) {
     res.render("index", {
       items,
       totalInventoryValue,
-      title: "Inventory Dashboard", // <-- Passed here
+      searchTerm, // Passed back to maintain input value
+      title: "Inventory Dashboard",
     });
   } catch (err) {
     console.error("Error in itemController (GET):", err);
     res.status(500).send("Internal Server Error");
   }
 }
-
 async function renderNewItemForm(req, res) {
   try {
     const categories = await categoryModel.getAllCategories();

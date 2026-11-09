@@ -75,9 +75,22 @@ async function getCategoryItems(req, res) {
   }
 }
 
+// Add this function to controllers/categoryController.js
+async function deleteCategory(req, res) {
+  try {
+    const { id } = req.params;
+    await categoryModel.deleteCategory(id);
+    res.redirect("/categories");
+  } catch (err) {
+    console.error("Error in categoryController (DELETE):", err);
+    res.status(500).send("Internal Server Error");
+  }
+}
+
+// Make sure to export deleteCategory in module.exports
 module.exports = {
-  getCategoriesList: renderCategoriesPage, // or keep both
   renderCategoriesPage,
   createCategory,
   getCategoryItems,
+  deleteCategory, // <-- Export delete controller
 };

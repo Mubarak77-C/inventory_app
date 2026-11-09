@@ -13,4 +13,7 @@ router.post("/", categoryController.createCategory);
 // GET /categories/:id/items -> Fetch items belonging to a specific category ID
 router.get("/:id/items", categoryController.getCategoryItems);
 
+// DELETE /categories/:id -> Handle category deletion
+router.delete("/:id", categoryController.deleteCategory);
+
 module.exports = router;

@@ -1,33 +1,20 @@
 // controllers/categoryController.js
 const categoryModel = require("../models/categoryModel");
-const itemModel = require("../models/itemModel"); // <-- Import item model
+const itemModel = require("../models/itemModel");
 
-// Render the categories management page
 async function renderCategoriesPage(req, res) {
   try {
     const categories = await categoryModel.getAllCategories();
-    res.render("categories", { categories });
+    res.render("categories", {
+      categories,
+      title: "Category Management", // <-- Passed here
+    });
   } catch (err) {
     console.error("Error in categoryController (renderCategoriesPage):", err);
     res.status(500).send("Internal Server Error");
   }
 }
 
-async function getCategoriesList(req, res) {
-  try {
-    const categories = await categoryModel.getAllCategories();
-    res.status(200).json({
-      success: true,
-      count: categories.length,
-      categories: categories,
-    });
-  } catch (err) {
-    console.error("Error in categoryController (GET):", err);
-    res.status(500).json({ success: false, error: "Internal Server Error" });
-  }
-}
-
-// Handle form submission to create a category and redirect
 async function createCategory(req, res) {
   try {
     const { name, description } = req.body;
@@ -47,35 +34,33 @@ async function createCategory(req, res) {
   }
 }
 
-// New controller function to fetch items by category ID
 async function getCategoryItems(req, res) {
   try {
-    const { id } = req.params; // Grabs the category ID from the URL parameter
-
-    // Optional: Fetch category details first to ensure it exists
+    const { id } = req.params;
     const categories = await categoryModel.getAllCategories();
     const targetCategory = categories.find((cat) => cat.id === parseInt(id));
 
     if (!targetCategory) {
-      return res
-        .status(404)
-        .json({ success: false, error: "Category not found." });
+      return res.status(404).send("Category not found.");
     }
 
     const items = await itemModel.getItemsByCategory(id);
 
-    // Render the index view, passing the filtered items and category name
+    const totalInventoryValue = items.reduce((sum, item) => {
+      return sum + Number(item.price) * Number(item.stock_count || 0);
+    }, 0);
+
     res.render("index", {
       items,
-      title: `${targetCategory.name} Inventory`,
+      totalInventoryValue,
+      title: `${targetCategory.name} Inventory`, // <-- Passed dynamically here
     });
   } catch (err) {
     console.error("Error in categoryController (getCategoryItems):", err);
-    res.status(500).json({ success: false, error: "Internal Server Error" });
+    res.status(500).send("Internal Server Error");
   }
 }
 
-// Add this function to controllers/categoryController.js
 async function deleteCategory(req, res) {
   try {
     const { id } = req.params;
@@ -87,10 +72,9 @@ async function deleteCategory(req, res) {
   }
 }
 
-// Make sure to export deleteCategory in module.exports
 module.exports = {
   renderCategoriesPage,
   createCategory,
   getCategoryItems,
-  deleteCategory, // <-- Export delete controller
+  deleteCategory,
 };

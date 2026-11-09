@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Inventory Dashboard</title>
+  <title><%= title %></title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Inter Font -->
@@ -15,20 +15,46 @@
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen">
 
-  <%- include('partials/header', { title: 'Inventory Dashboard' }) %>
+  <!-- Header Partial -->
+  <%- include('partials/header', { title: title }) %>
 
-  <div class="max-w-6xl mx-auto px-4 py-8">
-    <!-- Header Section with Title and Add Button -->
+  <!-- Main Container -->
+  <main class="max-w-6xl mx-auto px-4 py-8">
+    
+    <!-- Page Title & Add Button Section -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">📦 Restaurant & Store Inventory</h1>
-        <p class="text-sm text-gray-500 mt-1">Welcome to your operational dashboard.</p>
+        <h1 class="text-2xl font-bold text-gray-900">📦 <%= title %></h1>
+        <p class="text-sm text-gray-500 mt-1">Operational asset tracking and stock levels.</p>
       </div>
       <a href="/items/new" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition">
         + Add New Item
       </a>
     </div>
 
+    <!-- Summary Metric Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Asset Value</p>
+        <p class="text-2xl font-bold text-gray-900 mt-1">
+          $<%= typeof totalInventoryValue !== 'undefined' ? totalInventoryValue.toFixed(2) : '0.00' %>
+        </p>
+      </div>
+      <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Unique Items</p>
+        <p class="text-2xl font-bold text-gray-900 mt-1">
+          <%= items ? items.length : 0 %>
+        </p>
+      </div>
+      <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">System Status</p>
+        <p class="text-sm font-medium text-green-600 mt-2 flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-green-500"></span> Operational
+        </p>
+      </div>
+    </div>
+
+    <!-- Inventory Data Table -->
     <% if (items && items.length > 0) { %>
       <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
         <table class="min-w-full divide-y divide-gray-200">
@@ -53,39 +79,42 @@
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$<%= Number(item.price).toFixed(2) %></td>
-                <!-- <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><%= item.stock_count %></td> -->
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-  <% if (item.stock_count === 0) { %>
-    <span class="px-2.5 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded-full inline-flex items-center gap-1">
-      <span class="w-1.5 h-1.5 rounded-full bg-red-600"></span> Out of Stock
-    </span>
-  <% } else if (item.stock_count <= 5) { %>
-    <span class="px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-800 rounded-full inline-flex items-center gap-1">
-      <span class="w-1.5 h-1.5 rounded-full bg-amber-600"></span> Low Stock (<%= item.stock_count %> left)
-    </span>
-  <% } else { %>
-    <span class="px-2.5 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded-full inline-flex items-center gap-1">
-      <span class="w-1.5 h-1.5 rounded-full bg-green-600"></span> <%= item.stock_count %> in stock
-    </span>
-  <% } %>
-</td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-               <div class="flex items-center justify-end space-x-2">
-                  <!-- Edit Button with Pencil Icon -->
-    <a href="/items/<%= item.id %>/edit" class="inline-flex items-center p-1.5 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-lg transition" title="Edit Item">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-      </svg>
-    </a>  
-                  <!-- Delete Form with Trash Icon Button -->
-    <form action="/items/<%= item.id %>?_method=DELETE" method="POST" class="inline">
-      <button type="submit" class="inline-flex items-center p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition cursor-pointer" title="Delete Item" onclick="return confirm('Are you sure you want to delete this item?');">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-        </svg>
-      </button>
-    </form>
-    </div>
+                
+                <!-- Stock Status Badge -->
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <% if (item.stock_count === 0) { %>
+                    <span class="px-2.5 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded-full inline-flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-red-600"></span> Out of Stock
+                    </span>
+                  <% } else if (item.stock_count <= 5) { %>
+                    <span class="px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-800 rounded-full inline-flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-amber-600"></span> Low Stock (<%= item.stock_count %> left)
+                    </span>
+                  <% } else { %>
+                    <span class="px-2.5 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded-full inline-flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-green-600"></span> <%= item.stock_count %> in stock
+                    </span>
+                  <% } %>
+                </td>
+
+                <!-- Action Buttons with Icons -->
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <div class="flex items-center justify-end space-x-2">
+                    <!-- Edit Button -->
+                    <a href="/items/<%= item.id %>/edit" class="inline-flex items-center p-1.5 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-lg transition" title="Edit Item">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                      </svg>
+                    </a>  
+                    <!-- Delete Form & Button -->
+                    <form action="/items/<%= item.id %>?_method=DELETE" method="POST" class="inline">
+                      <button type="submit" class="inline-flex items-center p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition cursor-pointer" title="Delete Item" onclick="return confirm('Are you sure you want to delete this item?');">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                      </button>
+                    </form>
+                  </div>
                 </td>
               </tr>
             <% }) %>
@@ -93,14 +122,15 @@
         </table>
       </div>
     <% } else { %>
-      <div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+      <div class="bg-white rounded-xl border border-gray-200 p-12 text-center shadow-sm">
         <p class="text-gray-500 text-sm">No items found in inventory.</p>
         <a href="/items/new" class="mt-4 inline-block text-indigo-600 font-medium hover:underline text-sm">Create your first item &rarr;</a>
       </div>
     <% } %>
 
-  </div>
+  </main>
 
+  <!-- Footer Partial -->
   <%- include('partials/footer') %>
 </body>
 </html>

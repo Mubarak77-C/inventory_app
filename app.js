@@ -5,9 +5,12 @@ require("dotenv").config();
 
 const itemRouter = require("./routes/itemRouter");
 const categoryRouter = require("./routes/categoryRouter");
+const methodOverride = require("method-override");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.use(methodOverride("_method"));
 
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");

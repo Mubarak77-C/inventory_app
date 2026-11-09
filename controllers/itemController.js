@@ -6,16 +6,33 @@ const categoryModel = require("../models/categoryModel");
 async function getItemsList(req, res) {
   try {
     const searchTerm = req.query.search || "";
-    const items = await itemModel.getAllItems(searchTerm);
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = 10;
+    const offset = (page - 1) * limit;
 
-    const totalInventoryValue = items.reduce((sum, item) => {
+    const items = await itemModel.getPaginatedItems(searchTerm, limit, offset);
+    const totalItems = await itemModel.getTotalItemCount(searchTerm);
+    const totalPages = Math.ceil(totalItems / limit) || 1;
+
+    // --- ADD THESE DEBUG LOGS ---
+    console.log("--- DEBUG PAGINATION ---");
+    console.log("Total Items in DB:", totalItems);
+    console.log("Total Pages calculated:", totalPages);
+    console.log("Current Page:", page);
+    console.log("Items fetched for this page:", items.length);
+    // ----------------------------
+
+    const allMatchingItems = await itemModel.getAllItems(searchTerm);
+    const totalInventoryValue = allMatchingItems.reduce((sum, item) => {
       return sum + Number(item.price) * Number(item.stock_count || 0);
     }, 0);
 
     res.render("index", {
       items,
       totalInventoryValue,
-      searchTerm, // Passed back to maintain input value
+      searchTerm,
+      currentPage: page,
+      totalPages,
       title: "Inventory Dashboard",
     });
   } catch (err) {

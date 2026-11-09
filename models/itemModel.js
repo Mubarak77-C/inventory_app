@@ -83,6 +83,44 @@ async function deleteItem(id) {
   return rows[0]; // Returns undefined if ID doesn't exist
 }
 
+// models/itemModel.js
+
+// Fetch paginated items (with optional search filtering)
+async function getPaginatedItems(searchTerm = "", limit = 10, offset = 0) {
+  let query = `
+    SELECT items.*, categories.name AS category_name 
+    FROM items 
+    LEFT JOIN categories ON items.category_id = categories.id
+  `;
+  let params = [];
+
+  if (searchTerm.trim() !== "") {
+    query += ` WHERE items.name ILIKE $1`;
+    query += ` ORDER BY items.id DESC LIMIT $2 OFFSET $3;`;
+    params = [`%${searchTerm}%`, limit, offset];
+  } else {
+    query += ` ORDER BY items.id DESC LIMIT $1 OFFSET $2;`;
+    params = [limit, offset];
+  }
+
+  const { rows } = await pool.query(query, params);
+  return rows;
+}
+
+// Count total items (for calculating total pages)
+async function getTotalItemCount(searchTerm = "") {
+  let query = `SELECT COUNT(*) FROM items`;
+  let params = [];
+
+  if (searchTerm.trim() !== "") {
+    query += ` WHERE name ILIKE $1`;
+    params.push(`%${searchTerm}%`);
+  }
+
+  const { rows } = await pool.query(query, params);
+  return parseInt(rows[0].count, 10);
+}
+
 module.exports = {
   getAllItems,
   insertItem,
@@ -90,4 +128,6 @@ module.exports = {
   updateItem, // <-- Export update
   deleteItem, // <-- Export delete
   getItemById,
+  getPaginatedItems,
+  getTotalItemCount,
 };

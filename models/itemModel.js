@@ -28,10 +28,11 @@ async function getItemsByCategory(categoryId) {
   const query = `
     SELECT items.*, categories.name AS category_name 
     FROM items 
-    LEFT JOIN categories ON items.category_id = categories.Id;
+    LEFT JOIN categories ON items.category_id = categories.id
+    WHERE items.category_id = $1;
   `;
-  const { rows } = await pool.query(query);
-  return rows;
+  const { rows } = await pool.query(query, [categoryId]);
+  return rows; // Returns an array of items belonging to this category
 }
 
 // models/itemModel.js (add to existing functions and exports)
@@ -54,15 +55,16 @@ async function updateItem(
   const { rows } = await pool.query(query, values);
   return rows[0]; // Returns undefined if ID doesn't exist
 }
+// Replace your current getItemById with this:
 async function getItemById(id) {
   const query = `
     SELECT items.*, categories.name AS category_name 
     FROM items 
-    LEFT JOIN categories ON items.category_id = categories.id;
+    LEFT JOIN categories ON items.category_id = categories.id
+    WHERE items.id = $1;
   `;
-  const { rows } = await pool.query(query);
-
-  return result.rows[0];
+  const { rows } = await pool.query(query, [id]);
+  return rows[0]; // Return the single item object
 }
 
 async function deleteItem(id) {

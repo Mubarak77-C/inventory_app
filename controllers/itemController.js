@@ -26,8 +26,13 @@ async function createItem(req, res) {
   try {
     const { name, description, category_id, price, stock_count } = req.body;
 
-    if (!name || !category_id || !price) {
+    if (!name || !category_id || price === undefined) {
       return res.status(400).send("Missing required fields.");
+    }
+
+    // Check for negative price
+    if (Number(price) < 0) {
+      return res.status(400).send("Price cannot be negative.");
     }
 
     await itemModel.insertItem(
@@ -68,8 +73,13 @@ async function updateItem(req, res) {
     const { id } = req.params;
     const { name, description, category_id, price, stock_count } = req.body;
 
-    if (!name || !category_id || !price) {
+    if (!name || !category_id || price === undefined) {
       return res.status(400).send("Missing required fields.");
+    }
+
+    // Check for negative price
+    if (Number(price) < 0) {
+      return res.status(400).send("Price cannot be negative.");
     }
 
     await itemModel.updateItem(

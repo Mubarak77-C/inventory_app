@@ -2,7 +2,12 @@
 const pool = require("../db/pool");
 
 async function getAllItems() {
-  const { rows } = await pool.query("SELECT * FROM items");
+  const query = `
+    SELECT items.*, categories.name AS category_name 
+    FROM items 
+    LEFT JOIN categories ON items.category_id = categories.id;
+  `;
+  const { rows } = await pool.query(query);
   return rows;
 }
 
@@ -20,8 +25,12 @@ async function insertItem(name, description, category_id, price, stock_count) {
 
 // models/itemModel.js (add this function to your existing exports)
 async function getItemsByCategory(categoryId) {
-  const query = "SELECT * FROM items WHERE category_id = $1;";
-  const { rows } = await pool.query(query, [categoryId]);
+  const query = `
+    SELECT items.*, categories.name AS category_name 
+    FROM items 
+    LEFT JOIN categories ON items.category_id = categories.Id;
+  `;
+  const { rows } = await pool.query(query);
   return rows;
 }
 
@@ -46,7 +55,13 @@ async function updateItem(
   return rows[0]; // Returns undefined if ID doesn't exist
 }
 async function getItemById(id) {
-  const result = await pool.query("SELECT * FROM items WHERE id = $1", [id]);
+  const query = `
+    SELECT items.*, categories.name AS category_name 
+    FROM items 
+    LEFT JOIN categories ON items.category_id = categories.id;
+  `;
+  const { rows } = await pool.query(query);
+
   return result.rows[0];
 }
 

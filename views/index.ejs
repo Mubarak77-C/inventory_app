@@ -36,7 +36,7 @@
             <tr>
               <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
               <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Category ID</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
               <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Price</th>
               <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Stock</th>
               <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -49,7 +49,7 @@
                 <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate"><%= item.description || 'No description' %></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <span class="px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
-                    <%= item.category_id %>
+                    <%= item.category_name || 'Uncategorized' %>
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$<%= Number(item.price).toFixed(2) %></td>

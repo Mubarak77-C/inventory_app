@@ -45,6 +45,10 @@ async function updateItem(
   const { rows } = await pool.query(query, values);
   return rows[0]; // Returns undefined if ID doesn't exist
 }
+async function getItemById(id) {
+  const result = await pool.query("SELECT * FROM items WHERE id = $1", [id]);
+  return result.rows[0];
+}
 
 async function deleteItem(id) {
   const query = "DELETE FROM items WHERE id = $1 RETURNING *;";
@@ -58,4 +62,5 @@ module.exports = {
   getItemsByCategory,
   updateItem, // <-- Export update
   deleteItem, // <-- Export delete
+  getItemById,
 };

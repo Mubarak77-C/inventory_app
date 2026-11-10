@@ -1,6 +1,7 @@
 // controllers/itemController.js
 const itemModel = require("../models/itemModel");
 const categoryModel = require("../models/categoryModel");
+const { generateRestockAdvice } = require("../services/geminiService");
 
 // controllers/itemController.js
 async function getItemsList(req, res) {
@@ -140,6 +141,36 @@ async function deleteItem(req, res) {
   }
 }
 
+async function getRestockAdvisorReport(req, res) {
+  try {
+    // Fetch items where stock is 5 or less
+    const allItems = await itemModel.getAllItems();
+    const lowStockItems = allItems.filter(
+      (item) => Number(item.stock_count) <= 5,
+    );
+
+    if (lowStockItems.length === 0) {
+      return res.render("restockAdvisor", {
+        title: "AI Restock Advisor",
+        report:
+          "🎉 Great news! All inventory items are currently at healthy stock levels. No restock needed.",
+        lowStockItems: [],
+      });
+    }
+
+    const report = await generateRestockAdvice(lowStockItems);
+
+    res.render("restockAdvisor", {
+      title: "AI Restock Advisor",
+      report,
+      lowStockItems,
+    });
+  } catch (err) {
+    console.error("Error in restock advisor controller:", err);
+    res.status(500).send("Internal Server Error");
+  }
+}
+
 module.exports = {
   getItemsList,
   renderNewItemForm,
@@ -147,4 +178,5 @@ module.exports = {
   renderEditItemForm,
   updateItem,
   deleteItem,
+  getRestockAdvisorReport,
 };

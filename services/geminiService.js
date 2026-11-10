@@ -61,4 +61,37 @@ ${categoryList}`;
   }
 }
 
-module.exports = { generateItemDescription, suggestCategory };
+// Add this function to services/geminiService.js
+async function generateRestockAdvice(lowStockItems) {
+  try {
+    const itemList = lowStockItems
+      .map(
+        (item) =>
+          `- ${item.name} (${item.category_name || "Uncategorized"}): Only ${item.stock_count} left in stock. Price: $${item.price}`,
+      )
+      .join("\n");
+
+    const prompt = `You are an expert restaurant and inventory manager. 
+Analyze the following low-stock or out-of-stock inventory items and write a concise executive restocking report. 
+Provide actionable priorities (Urgent restock vs Moderate restock) and practical purchasing advice. Keep it professional, structured with markdown bullet points, and under 150 words.
+
+Low-Stock Items:
+${itemList}`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash-lite",
+      contents: prompt,
+    });
+
+    return response.text.trim();
+  } catch (err) {
+    console.error("Error generating restock advice:", err);
+    return "Unable to generate AI restock advice at this time.";
+  }
+}
+
+module.exports = {
+  generateItemDescription,
+  suggestCategory,
+  generateRestockAdvice,
+};

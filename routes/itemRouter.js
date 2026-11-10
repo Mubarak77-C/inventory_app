@@ -9,6 +9,12 @@ const {
 const categoryModel = require("../models/categoryModel");
 const router = Router();
 
+// Add this import at the top of routes/itemRouter.js if not already present
+// (itemController already imports itemModel)
+
+// Add this route ABOVE your dynamic /:id routes
+router.get("/restock-advisor", itemController.getRestockAdvisorReport);
+
 // Add this route inside routes/itemRouter.js (above dynamic /:id routes)
 router.post("/generate-description", async (req, res) => {
   try {

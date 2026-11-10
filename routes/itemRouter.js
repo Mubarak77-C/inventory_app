@@ -1,6 +1,7 @@
 // routes/itemRouter.js
 const { Router } = require("express");
 const itemController = require("../controllers/itemController");
+const multer = require("multer");
 // const { generateItemDescription } = require("../services/geminiService");
 const {
   generateItemDescription,
@@ -19,6 +20,15 @@ router.get("/restock-advisor", itemController.getRestockAdvisorReport);
 
 router.get("/chatbot", itemController.renderChatbotPage);
 router.post("/chatbot", itemController.handleChatQuery);
+
+// Configure multer to store uploaded image temporarily in memory buffer
+const upload = multer({ storage: multer.memoryStorage() });
+
+router.post(
+  "/scan-image",
+  upload.single("itemImage"),
+  itemController.scanItemImage,
+);
 
 // Add this route inside routes/itemRouter.js (above dynamic /:id routes)
 router.post("/generate-description", async (req, res) => {

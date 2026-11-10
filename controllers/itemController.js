@@ -3,6 +3,7 @@ const itemModel = require("../models/itemModel");
 const categoryModel = require("../models/categoryModel");
 const { generateRestockAdvice } = require("../services/geminiService");
 const { askInventoryAssistant } = require("../services/geminiService");
+const { extractItemFromImage } = require("../services/geminiService");
 
 // controllers/itemController.js
 async function getItemsList(req, res) {
@@ -259,6 +260,30 @@ async function clearChat(req, res) {
   }
 }
 
+async function scanItemImage(req, res) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No image uploaded" });
+    }
+
+    const extractedData = await extractItemFromImage(
+      req.file.buffer,
+      req.file.mimetype,
+    );
+
+    if (!extractedData) {
+      return res
+        .status(500)
+        .json({ error: "Failed to parse image data with AI" });
+    }
+
+    res.json(extractedData);
+  } catch (err) {
+    console.error("Error in image scan route:", err);
+    res.status(500).json({ error: "Internal server error during scan" });
+  }
+}
+
 module.exports = {
   getItemsList,
   renderNewItemForm,
@@ -270,4 +295,5 @@ module.exports = {
   renderChatbotPage,
   handleChatQuery,
   clearChat,
+  scanItemImage,
 };

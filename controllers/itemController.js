@@ -303,6 +303,61 @@ async function exportInventoryPDF(req, res) {
   }
 }
 
+async function renderDashboard(req, res) {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10;
+    const search = req.query.search || "";
+
+    // Get paginated items and total count
+    const items = await itemModel.getItemsPaginated(page, limit, search);
+    const totalItemsCount = await itemModel.getTotalCount(search);
+    const totalPages = Math.ceil(totalItemsCount / limit);
+
+    // Fetch ALL items for calculating dashboard metrics & charts
+    const allItems = await itemModel.getAllItems();
+    const categories = await categoryModel.getAllCategories();
+
+    // Calculate total inventory value
+    const totalInventoryValue = allItems.reduce(
+      (acc, item) => acc + Number(item.price) * Number(item.stock_count),
+      0,
+    );
+
+    // Calculate category breakdown for Chart.js
+    const categoryData = categories.map((cat) => {
+      const catItems = allItems.filter((i) => i.category_id === cat.id);
+      const stockSum = catItems.reduce(
+        (acc, i) => acc + Number(i.stock_count),
+        0,
+      );
+      const valueSum = catItems.reduce(
+        (acc, i) => acc + Number(i.price) * Number(i.stock_count),
+        0,
+      );
+      return {
+        name: cat.name,
+        count: catItems.length,
+        stock: stockSum,
+        value: valueSum,
+      };
+    });
+
+    res.render("index", {
+      title: "Inventory Dashboard",
+      items,
+      currentPage: page,
+      totalPages,
+      searchTerm: search,
+      totalInventoryValue,
+      categoryData, // Pass analytics data to the view
+    });
+  } catch (err) {
+    console.error("Error rendering dashboard:", err);
+    res.status(500).send("Internal Server Error");
+  }
+}
+
 module.exports = {
   getItemsList,
   renderNewItemForm,
@@ -316,4 +371,5 @@ module.exports = {
   clearChat,
   scanItemImage,
   exportInventoryPDF,
+  renderDashboard,
 };

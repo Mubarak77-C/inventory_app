@@ -172,20 +172,6 @@ async function getRestockAdvisorReport(req, res) {
   }
 }
 
-// Render the chatbot UI page
-async function renderChatbotPage(req, res) {
-  try {
-    res.render("chatbot", {
-      title: "AI Inventory Assistant",
-      answer: null,
-      question: "",
-    });
-  } catch (err) {
-    console.error("Error rendering chatbot page:", err);
-    res.status(500).send("Internal Server Error");
-  }
-}
-
 // Handle chat submissions
 async function handleChatQuery(req, res) {
   try {
@@ -215,7 +201,63 @@ async function handleChatQuery(req, res) {
   }
 }
 
-// Export these two functions at the bottom of itemController.js
+// tracking chatbot and render save to table history_chat
+// Render the chatbot UI page
+async function renderChatbotPage(req, res) {
+  try {
+    const history = await itemModel.getChatHistory(30); // Load last 30 messages
+    res.render("chatbot", {
+      title: "AI Inventory Assistant",
+      history,
+    });
+  } catch (err) {
+    console.error("Error rendering chatbot page:", err);
+    res.status(500).send("Internal Server Error");
+  }
+}
+
+async function handleChatQuery(req, res) {
+  try {
+    const { question } = req.body;
+    if (!question || !question.trim()) {
+      return res.redirect("/items/chatbot");
+    }
+
+    // 1. Fetch current items & categories for snapshot context
+    const allItems = await itemModel.getAllItems();
+    const categories = await categoryModel.getAllCategories();
+
+    // 2. Ask Gemini with current context
+    const answer = await askInventoryAssistant(question, allItems, categories);
+
+    // 3. Save to database with a snapshot of the inventory state at this exact timestamp
+    const snapshotData = {
+      itemCount: allItems.length,
+      items: allItems.map((i) => ({
+        name: i.name,
+        stock: i.stock_count,
+        price: i.price,
+      })),
+    };
+
+    await itemModel.saveChatMessage(question, answer, snapshotData);
+
+    res.redirect("/items/chatbot");
+  } catch (err) {
+    console.error("Error handling chat query:", err);
+    res.status(500).send("Internal Server Error");
+  }
+}
+
+async function clearChat(req, res) {
+  try {
+    await itemModel.clearChatHistory();
+    res.redirect("/items/chatbot");
+  } catch (err) {
+    console.error("Error clearing chat history:", err);
+    res.status(500).send("Internal Server Error");
+  }
+}
 
 module.exports = {
   getItemsList,
@@ -227,4 +269,5 @@ module.exports = {
   getRestockAdvisorReport,
   renderChatbotPage,
   handleChatQuery,
+  clearChat,
 };

@@ -11,7 +11,9 @@ const router = Router();
 
 // Add this import at the top of routes/itemRouter.js if not already present
 // (itemController already imports itemModel)
-
+router.get("/chatbot", itemController.renderChatbotPage);
+router.post("/chatbot", itemController.handleChatQuery);
+router.post("/chatbot/clear", itemController.clearChat);
 // Add this route ABOVE your dynamic /:id routes
 router.get("/restock-advisor", itemController.getRestockAdvisorReport);
 

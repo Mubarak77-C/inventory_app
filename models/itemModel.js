@@ -121,6 +121,37 @@ async function getTotalItemCount(searchTerm = "") {
   return parseInt(rows[0].count, 10);
 }
 
+// Add these functions to models/itemModel.js
+
+async function saveChatMessage(question, answer, snapshot) {
+  const query = `
+    INSERT INTO chat_history (user_question, ai_answer, inventory_snapshot)
+    VALUES ($1, $2, $3)
+    RETURNING *;
+  `;
+  const { rows } = await pool.query(query, [
+    question,
+    answer,
+    JSON.stringify(snapshot),
+  ]);
+  return rows[0];
+}
+
+async function getChatHistory(limit = 20) {
+  const query = `
+    SELECT * FROM chat_history 
+    ORDER BY created_at ASC 
+    LIMIT $1;
+  `;
+  const { rows } = await pool.query(query, [limit]);
+  return rows;
+}
+
+async function clearChatHistory() {
+  const query = `DELETE FROM chat_history;`;
+  await pool.query(query);
+}
+
 module.exports = {
   getAllItems,
   insertItem,
@@ -130,4 +161,7 @@ module.exports = {
   getItemById,
   getPaginatedItems,
   getTotalItemCount,
+  saveChatMessage,
+  getChatHistory,
+  clearChatHistory,
 };

@@ -141,9 +141,49 @@ User Question: "${userQuestion}"`;
   }
 }
 
+async function extractItemFromImage(imageBuffer, mimeType) {
+  try {
+    // Convert image buffer to the inline format expected by @google/genai
+    const imagePart = {
+      inlineData: {
+        data: imageBuffer.toString("base64"),
+        mimeType: mimeType,
+      },
+    };
+
+    const prompt = `Analyze this image (which may be a product, receipt, or invoice) and extract inventory details for a new item.
+Return ONLY a valid JSON object with these exact keys (no markdown code blocks, just raw JSON):
+{
+  "name": "Extracted item name",
+  "description": "Short catchy description under 25 words",
+  "price": 0.00,
+  "stock_count": 1
+}`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash-lite",
+      contents: [imagePart, prompt],
+    });
+
+    let textResponse = response.text.trim();
+    // Clean up potential markdown formatting if Gemini includes backticks
+    textResponse = textResponse
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    return JSON.parse(textResponse);
+  } catch (err) {
+    console.error("Error extracting item from image:", err);
+    return null;
+  }
+}
+
+// Don't forget to export extractItemFromImage along with your other functions
 module.exports = {
   generateItemDescription,
   suggestCategory,
-  generateRestockAdvice,
+  generateRestockAdvisor,
   askInventoryAssistant,
+  extractItemFromImage,
 };

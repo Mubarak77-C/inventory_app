@@ -14,23 +14,40 @@ async function getItemsList(req, res) {
     const limit = 10;
     const offset = (page - 1) * limit;
 
+    // 1. Fetch paginated items for the table
     const items = await itemModel.getPaginatedItems(searchTerm, limit, offset);
     const totalItems = await itemModel.getTotalItemCount(searchTerm);
     const totalPages = Math.ceil(totalItems / limit) || 1;
 
-    // --- ADD THESE DEBUG LOGS ---
-    console.log("--- DEBUG PAGINATION ---");
-    console.log("Total Items in DB:", totalItems);
-    console.log("Total Pages calculated:", totalPages);
-    console.log("Current Page:", page);
-    console.log("Items fetched for this page:", items.length);
-    // ----------------------------
+    // 2. Fetch ALL items & categories for calculating executive metrics and charts
+    const allItems = await itemModel.getAllItems();
+    const categories = await categoryModel.getAllCategories();
 
-    const allMatchingItems = await itemModel.getAllItems(searchTerm);
-    const totalInventoryValue = allMatchingItems.reduce((sum, item) => {
+    // 3. Calculate total inventory asset value
+    const totalInventoryValue = allItems.reduce((sum, item) => {
       return sum + Number(item.price) * Number(item.stock_count || 0);
     }, 0);
 
+    // 4. Calculate category breakdown for Chart.js
+    const categoryData = categories.map((cat) => {
+      const catItems = allItems.filter((i) => i.category_id === cat.id);
+      const stockSum = catItems.reduce(
+        (acc, i) => acc + Number(i.stock_count || 0),
+        0,
+      );
+      const valueSum = catItems.reduce(
+        (acc, i) => acc + Number(i.price) * Number(i.stock_count || 0),
+        0,
+      );
+      return {
+        name: cat.name,
+        count: catItems.length,
+        stock: stockSum,
+        value: valueSum,
+      };
+    });
+
+    // 5. Render index view with all required analytics data
     res.render("index", {
       items,
       totalInventoryValue,
@@ -38,9 +55,10 @@ async function getItemsList(req, res) {
       currentPage: page,
       totalPages,
       title: "Inventory Dashboard",
+      categoryData, // <-- Passed to view for Chart.js
     });
   } catch (err) {
-    console.error("Error in itemController (GET):", err);
+    console.error("Error in itemController (getItemsList):", err);
     res.status(500).send("Internal Server Error");
   }
 }
@@ -303,60 +321,60 @@ async function exportInventoryPDF(req, res) {
   }
 }
 
-async function renderDashboard(req, res) {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = 10;
-    const search = req.query.search || "";
+// async function renderDashboard(req, res) {
+//   try {
+//     const page = parseInt(req.query.page) || 1;
+//     const limit = 10;
+//     const search = req.query.search || "";
 
-    // Get paginated items and total count
-    const items = await itemModel.getItemsPaginated(page, limit, search);
-    const totalItemsCount = await itemModel.getTotalCount(search);
-    const totalPages = Math.ceil(totalItemsCount / limit);
+//     // Get paginated items and total count
+//     const items = await itemModel.getItemsPaginated(page, limit, search);
+//     const totalItemsCount = await itemModel.getTotalCount(search);
+//     const totalPages = Math.ceil(totalItemsCount / limit);
 
-    // Fetch ALL items for calculating dashboard metrics & charts
-    const allItems = await itemModel.getAllItems();
-    const categories = await categoryModel.getAllCategories();
+//     // Fetch ALL items for calculating dashboard metrics & charts
+//     const allItems = await itemModel.getAllItems();
+//     const categories = await categoryModel.getAllCategories();
 
-    // Calculate total inventory value
-    const totalInventoryValue = allItems.reduce(
-      (acc, item) => acc + Number(item.price) * Number(item.stock_count),
-      0,
-    );
+//     // Calculate total inventory value
+//     const totalInventoryValue = allItems.reduce(
+//       (acc, item) => acc + Number(item.price) * Number(item.stock_count),
+//       0,
+//     );
 
-    // Calculate category breakdown for Chart.js
-    const categoryData = categories.map((cat) => {
-      const catItems = allItems.filter((i) => i.category_id === cat.id);
-      const stockSum = catItems.reduce(
-        (acc, i) => acc + Number(i.stock_count),
-        0,
-      );
-      const valueSum = catItems.reduce(
-        (acc, i) => acc + Number(i.price) * Number(i.stock_count),
-        0,
-      );
-      return {
-        name: cat.name,
-        count: catItems.length,
-        stock: stockSum,
-        value: valueSum,
-      };
-    });
+//     // Calculate category breakdown for Chart.js
+//     const categoryData = categories.map((cat) => {
+//       const catItems = allItems.filter((i) => i.category_id === cat.id);
+//       const stockSum = catItems.reduce(
+//         (acc, i) => acc + Number(i.stock_count),
+//         0,
+//       );
+//       const valueSum = catItems.reduce(
+//         (acc, i) => acc + Number(i.price) * Number(i.stock_count),
+//         0,
+//       );
+//       return {
+//         name: cat.name,
+//         count: catItems.length,
+//         stock: stockSum,
+//         value: valueSum,
+//       };
+//     });
 
-    res.render("index", {
-      title: "Inventory Dashboard",
-      items,
-      currentPage: page,
-      totalPages,
-      searchTerm: search,
-      totalInventoryValue,
-      categoryData, // Pass analytics data to the view
-    });
-  } catch (err) {
-    console.error("Error rendering dashboard:", err);
-    res.status(500).send("Internal Server Error");
-  }
-}
+//     res.render("index", {
+//       title: "Inventory Dashboard",
+//       items,
+//       currentPage: page,
+//       totalPages,
+//       searchTerm: search,
+//       totalInventoryValue,
+//       categoryData, // Pass analytics data to the view
+//     });
+//   } catch (err) {
+//     console.error("Error rendering dashboard:", err);
+//     res.status(500).send("Internal Server Error");
+//   }
+// }
 
 module.exports = {
   getItemsList,
@@ -371,5 +389,5 @@ module.exports = {
   clearChat,
   scanItemImage,
   exportInventoryPDF,
-  renderDashboard,
+  // renderDashboard,
 };

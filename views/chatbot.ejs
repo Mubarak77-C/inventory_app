@@ -1,0 +1,78 @@
+<!-- views/chatbot.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style> body { font-family: 'Inter', sans-serif; } </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+
+  <%- include('partials/header', { title: title }) %>
+
+  <main class="max-w-3xl mx-auto px-4 py-8">
+    
+    <!-- Header -->
+    <div class="mb-6 flex justify-between items-center">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">💬 AI Inventory Chatbot</h1>
+        <p class="text-sm text-gray-500 mt-1">Ask questions about stock levels, pricing, or asset values in plain English.</p>
+      </div>
+      <a href="/items" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+        &larr; Dashboard
+      </a>
+    </div>
+
+    <!-- Chat Box Container -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6 flex flex-col space-y-4">
+      
+      <!-- Previous Question & Answer Display -->
+      <% if (question) { %>
+        <div class="flex flex-col space-y-3">
+          <!-- User Bubble -->
+          <div class="self-end bg-indigo-600 text-white px-4 py-2.5 rounded-2xl rounded-tr-none text-sm max-w-lg shadow-sm">
+            <%= question %>
+          </div>
+          <!-- AI Response Bubble -->
+          <div class="self-start bg-gray-100 text-gray-800 px-4 py-3 rounded-2xl rounded-tl-none text-sm max-w-xl shadow-sm border border-gray-200 whitespace-pre-line leading-relaxed">
+            <span class="font-semibold block mb-1 text-indigo-600">🤖 Gemini Assistant</span>
+            <%= answer %>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="text-center py-8 text-gray-400 text-sm">
+          <p>No questions asked yet. Try asking something below!</p>
+          <div class="flex flex-wrap justify-center gap-2 mt-4">
+            <button onclick="setQuery('What items are out of stock?')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-full transition">"What items are out of stock?"</button>
+            <button onclick="setQuery('What is our most expensive item?')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-full transition">"What is our most expensive item?"</button>
+            <button onclick="setQuery('Give me a summary of total items.')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-full transition">"Give me a summary of total items."</button>
+          </div>
+        </div>
+      <% } %>
+
+    </div>
+
+    <!-- Input Form -->
+    <form action="/items/chatbot" method="POST" class="flex gap-3">
+      <input type="text" name="question" id="questionInput" placeholder="Ask a question about your inventory..." required
+             class="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-indigo-500 focus:border-indigo-500 shadow-sm">
+      <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl text-sm font-medium shadow-sm transition cursor-pointer">
+        Ask AI
+      </button>
+    </form>
+
+  </main>
+
+  <script>
+    function setQuery(text) {
+      document.getElementById('questionInput').value = text;
+      document.getElementById('questionInput').focus();
+    }
+  </script>
+
+  <%- include('partials/footer') %>
+</body>
+</html>

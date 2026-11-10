@@ -15,6 +15,9 @@ const router = Router();
 // Add this route ABOVE your dynamic /:id routes
 router.get("/restock-advisor", itemController.getRestockAdvisorReport);
 
+router.get("/chatbot", itemController.renderChatbotPage);
+router.post("/chatbot", itemController.handleChatQuery);
+
 // Add this route inside routes/itemRouter.js (above dynamic /:id routes)
 router.post("/generate-description", async (req, res) => {
   try {

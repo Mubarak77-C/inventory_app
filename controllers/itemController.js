@@ -2,6 +2,7 @@
 const itemModel = require("../models/itemModel");
 const categoryModel = require("../models/categoryModel");
 const { generateRestockAdvice } = require("../services/geminiService");
+const { askInventoryAssistant } = require("../services/geminiService");
 
 // controllers/itemController.js
 async function getItemsList(req, res) {
@@ -171,6 +172,51 @@ async function getRestockAdvisorReport(req, res) {
   }
 }
 
+// Render the chatbot UI page
+async function renderChatbotPage(req, res) {
+  try {
+    res.render("chatbot", {
+      title: "AI Inventory Assistant",
+      answer: null,
+      question: "",
+    });
+  } catch (err) {
+    console.error("Error rendering chatbot page:", err);
+    res.status(500).send("Internal Server Error");
+  }
+}
+
+// Handle chat submissions
+async function handleChatQuery(req, res) {
+  try {
+    const { question } = req.body;
+    if (!question) {
+      return res.render("chatbot", {
+        title: "AI Inventory Assistant",
+        answer: "Please ask a question about your inventory.",
+        question: "",
+      });
+    }
+
+    // Fetch live inventory and categories from database to give Gemini context
+    const allItems = await itemModel.getAllItems();
+    const categories = await categoryModel.getAllCategories();
+
+    const answer = await askInventoryAssistant(question, allItems, categories);
+
+    res.render("chatbot", {
+      title: "AI Inventory Assistant",
+      answer,
+      question,
+    });
+  } catch (err) {
+    console.error("Error handling chat query:", err);
+    res.status(500).send("Internal Server Error");
+  }
+}
+
+// Export these two functions at the bottom of itemController.js
+
 module.exports = {
   getItemsList,
   renderNewItemForm,
@@ -179,4 +225,6 @@ module.exports = {
   updateItem,
   deleteItem,
   getRestockAdvisorReport,
+  renderChatbotPage,
+  handleChatQuery,
 };

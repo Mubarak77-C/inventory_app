@@ -21,6 +21,8 @@ router.get("/restock-advisor", itemController.getRestockAdvisorReport);
 router.get("/chatbot", itemController.renderChatbotPage);
 router.post("/chatbot", itemController.handleChatQuery);
 
+router.get("/export-pdf", itemController.exportInventoryPDF);
+
 // Configure multer to store uploaded image temporarily in memory buffer
 const upload = multer({ storage: multer.memoryStorage() });
 

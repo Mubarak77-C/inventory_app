@@ -4,6 +4,7 @@ const categoryModel = require("../models/categoryModel");
 const { generateRestockAdvice } = require("../services/geminiService");
 const { askInventoryAssistant } = require("../services/geminiService");
 const { extractItemFromImage } = require("../services/geminiService");
+const { generateInventoryPDF } = require("../services/pdfService");
 
 // controllers/itemController.js
 async function getItemsList(req, res) {
@@ -284,6 +285,24 @@ async function scanItemImage(req, res) {
   }
 }
 
+async function exportInventoryPDF(req, res) {
+  try {
+    const allItems = await itemModel.getAllItems();
+
+    // Set headers so browser downloads it as a PDF attachment
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=inventory-report.pdf",
+    );
+
+    generateInventoryPDF(allItems, res);
+  } catch (err) {
+    console.error("Error generating inventory PDF:", err);
+    res.status(500).send("Internal Server Error");
+  }
+}
+
 module.exports = {
   getItemsList,
   renderNewItemForm,
@@ -296,4 +315,5 @@ module.exports = {
   handleChatQuery,
   clearChat,
   scanItemImage,
+  exportInventoryPDF,
 };

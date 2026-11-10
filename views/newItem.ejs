@@ -59,6 +59,14 @@
   </head>
   <body>
 
+
+
+    <div class="form-container">
+        <!-- views/newItem.ejs -->
+<!-- views/newItem.ejs -->
+<%- include('partials/header', { title: 'Add New Item' }) %>
+
+<h1>📦 Add New Item</h1>
     <!-- Add this banner at the top of your form in views/newItem.ejs -->
 <div class="mb-6 p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
   <label class="block text-sm font-semibold text-indigo-900 mb-1">📷 Fast-Track with AI Image Scanner</label>
@@ -70,13 +78,6 @@
     </button>
   </div>
 </div>
-
-    <div class="form-container">
-        <!-- views/newItem.ejs -->
-<!-- views/newItem.ejs -->
-<%- include('partials/header', { title: 'Add New Item' }) %>
-
-<h1>📦 Add New Item</h1>
 <form action="/items" method="POST">
   <label for="name">Item Name:</label>
   <input type="text" id="name" name="name" required>

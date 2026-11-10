@@ -1,7 +1,12 @@
 // routes/itemRouter.js
 const { Router } = require("express");
 const itemController = require("../controllers/itemController");
-const { generateItemDescription } = require("../services/geminiService");
+// const { generateItemDescription } = require("../services/geminiService");
+const {
+  generateItemDescription,
+  suggestCategory,
+} = require("../services/geminiService");
+const categoryModel = require("../models/categoryModel");
 const router = Router();
 
 // Add this route inside routes/itemRouter.js (above dynamic /:id routes)
@@ -30,6 +35,27 @@ router.post("/generate-description", async (req, res) => {
     res
       .status(500)
       .json({ error: err.message || "Failed to generate description" });
+  }
+});
+
+router.post("/suggest-category", async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: "Item name is required" });
+    }
+
+    // Fetch existing categories from DB
+    const categories = await categoryModel.getAllCategories();
+    if (!categories || categories.length === 0) {
+      return res.status(400).json({ error: "No categories available" });
+    }
+
+    const suggestedId = await suggestCategory(name, categories);
+    res.json({ categoryId: suggestedId });
+  } catch (err) {
+    console.error("Error in category suggestion route:", err);
+    res.status(500).json({ error: "Failed to suggest category" });
   }
 });
 

@@ -14,14 +14,23 @@
   <%- include('partials/header', { title: title }) %>
 
   <main class="max-w-4xl mx-auto px-4 py-8">
-    <div class="mb-6 flex justify-between items-center">
+    
+    <!-- Header & Action Buttons -->
+    <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <div>
         <h1 class="text-2xl font-bold text-gray-900">🤖 AI Restock Advisor</h1>
         <p class="text-sm text-gray-500 mt-1">Automated purchasing insights powered by Gemini.</p>
       </div>
-      <a href="/items" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
-        &larr; Back to Dashboard
-      </a>
+      <div class="flex items-center gap-3">
+        <!-- Retry / Refresh Button -->
+        <button onclick="window.location.reload();" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer">
+          🔄 Refresh AI Report
+        </button>
+        <!-- Back Button -->
+        <a href="/items" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+          &larr; Dashboard
+        </a>
+      </div>
     </div>
 
     <!-- AI Report Card -->

@@ -3,3 +3,6 @@ node_modules
 dist/
 *.log
 .env
+repomix-output.*
+pgdata/
+postgres_data/

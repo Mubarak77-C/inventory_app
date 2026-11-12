@@ -31,12 +31,13 @@ INSERT INTO items (name, description, category_id, price, stock_count) VALUES
   ('Blender', 'Commercial grade heavy duty blender', 1, 120.50, 4),
   ('Cocktail Shaker', 'Stainless steel Boston shaker set', 2, 15.00, 25);
 
-  -- 4 .Create chat_history table for the Gemini AI chatbot feature
+  
+-- 4. Create chat_history table matching itemModel.js expectations
 DROP TABLE IF EXISTS chat_history;
 
 CREATE TABLE chat_history (
   id SERIAL PRIMARY KEY,
-  user_message TEXT NOT NULL,
-  ai_response TEXT NOT NULL,
+  user_question TEXT NOT NULL,
+  ai_answer TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

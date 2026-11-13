@@ -34,14 +34,14 @@ jobs:
           docker network create test-net
           docker run -d --name test-postgres --network test-net \
             -e POSTGRES_USER=my_user \
-            -e POSTGRES_PASSWORD=test_ci_password \
+            -e POSTGRES_PASSWORD=${{ github.run_id }} \
             -e POSTGRES_DB=inventory_db \
             postgres:15-alpine
           sleep 5
           docker exec -i test-postgres psql -U my_user -d inventory_db < db/populatedb.sql
           docker run -d --name test-app --network test-net -p 3000:3000 \
-            -e DATABASE_URL=postgresql://my_user:test_ci_password@test-postgres:5432/inventory_db \
-            -e GEMINI_API_KEY=test_ci_key \
+            -e DATABASE_URL=postgresql://my_user:${{ github.run_id }}@test-postgres:5432/inventory_db \
+            -e GEMINI_API_KEY=${{ github.run_id }}
             -e PORT=3000 \
             inventory-app-test
           sleep 5

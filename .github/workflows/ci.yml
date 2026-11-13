@@ -36,7 +36,7 @@ jobs:
             -e POSTGRES_USER=my_user \
             -e POSTGRES_PASSWORD=${{ github.run_id }} \
             -e POSTGRES_DB=inventory_db \
-            postgres:15-alpine
+            pgvector/pgvector:pg15
           sleep 5
           docker exec -i test-postgres psql -U my_user -d inventory_db < db/populatedb.sql
           docker run -d --name test-app --network test-net -p 3000:3000 \

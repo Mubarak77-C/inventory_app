@@ -16,7 +16,7 @@ services:
     restart: always
 
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: inventory_postgres
     environment:
       - POSTGRES_USER=my_user

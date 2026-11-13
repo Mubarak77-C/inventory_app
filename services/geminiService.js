@@ -109,18 +109,18 @@ ${itemList}`;
 // Add this function to services/geminiService.js
 async function askInventoryAssistant(userQuestion, allItems, categories) {
   try {
-    // Format inventory items into text context for Gemini
+    // Format inventory items into text context for Gemini (including ID and timestamp)
     const inventoryContext = allItems
       .map(
         (item) =>
-          `Name: ${item.name}, Category: ${item.category_name || "Uncategorized"}, Price: $${item.price}, Stock: ${item.stock_count}, Description: ${item.description || "None"}`,
+          `ID: ${item.id}, Name: ${item.name}, Category: ${item.category_name || "Uncategorized"}, Price: $${item.price}, Stock: ${item.stock_count}, Added At: ${item.created_at || "Unknown"}, Description: ${item.description || "None"}`,
       )
       .join("\n");
 
     const categoryContext = categories.map((c) => c.name).join(", ");
 
     const prompt = `You are an expert AI Inventory & Restaurant Manager Assistant. 
-You have access to the current database records below. Answer the user's question clearly, professionally, and concisely based ONLY on this data. If you don't know or the item isn't listed, state that politely.
+You have access to the current database records below (ordered newest to oldest by ID and Added At timestamp). Answer the user's question clearly, professionally, and concisely based ONLY on this data. If you don't know or the item isn't listed, state that politely.
 
 Available Categories: ${categoryContext}
 

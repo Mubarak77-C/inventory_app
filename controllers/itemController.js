@@ -192,35 +192,6 @@ async function getRestockAdvisorReport(req, res) {
   }
 }
 
-// Handle chat submissions
-async function handleChatQuery(req, res) {
-  try {
-    const { question } = req.body;
-    if (!question) {
-      return res.render("chatbot", {
-        title: "AI Inventory Assistant",
-        answer: "Please ask a question about your inventory.",
-        question: "",
-      });
-    }
-
-    // Fetch live inventory and categories from database to give Gemini context
-    const allItems = await itemModel.getAllItems();
-    const categories = await categoryModel.getAllCategories();
-
-    const answer = await askInventoryAssistant(question, allItems, categories);
-
-    res.render("chatbot", {
-      title: "AI Inventory Assistant",
-      answer,
-      question,
-    });
-  } catch (err) {
-    console.error("Error handling chat query:", err);
-    res.status(500).send("Internal Server Error");
-  }
-}
-
 // tracking chatbot and render save to table history_chat
 // Render the chatbot UI page
 async function renderChatbotPage(req, res) {
@@ -257,6 +228,7 @@ async function handleChatQuery(req, res) {
         name: i.name,
         stock: i.stock_count,
         price: i.price,
+        added_at: i.created_at,
       })),
     };
 

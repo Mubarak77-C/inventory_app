@@ -18,7 +18,8 @@ CREATE TABLE items (
   description TEXT,
   category_id INT REFERENCES categories(id) ON DELETE CASCADE,
   price NUMERIC(10, 2) NOT NULL,
-  stock_count INT NOT NULL DEFAULT 0
+  stock_count INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 3. Insert Initial Dummy Data (Seed data)

@@ -123,18 +123,16 @@ async function getTotalItemCount(searchTerm = "") {
 
 // Add these functions to models/itemModel.js
 
-async function saveChatMessage(question, answer, snapshot) {
+async function saveChatMessage(userMessage, aiResponse, snapshotData) {
   const query = `
-    INSERT INTO chat_history (user_question, ai_answer, inventory_snapshot)
+    INSERT INTO chat_history (user_question, ai_response, snapshot_data) 
     VALUES ($1, $2, $3)
-    RETURNING *;
   `;
-  const { rows } = await pool.query(query, [
-    question,
-    answer,
-    JSON.stringify(snapshot),
+  await pool.query(query, [
+    userMessage,
+    aiResponse,
+    JSON.stringify(snapshotData),
   ]);
-  return rows[0];
 }
 
 async function getChatHistory(limit = 20) {

@@ -2,9 +2,9 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
-// Reads the DATABASE_URL from your .env file
+// Reads the DATABASE_URL from your environment (which Docker injects)
 module.exports = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // If you are hosting remotely later (like Render/Supabase),
-  // you may need ssl: { rejectUnauthorized: false }
+  // If hosting remotely later (like Render/Supabase), you can add SSL config here if needed
+  ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
 });

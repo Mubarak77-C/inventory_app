@@ -1,0 +1,36 @@
+name: CI Build & Docker Check
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify app.js syntax
+        run: node --check app.js
+
+      - name: Test Docker image build
+        run: docker build -t inventory-app-test .
+
+      - name: Validate docker-compose.yml syntax
+        env:
+          DB_PASSWORD: test_ci_password
+          GEMINI_API_KEY: test_ci_key
+        run: docker compose config --quiet

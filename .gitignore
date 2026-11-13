@@ -1,2 +1,8 @@
 node_modules
+.envnode_modules/
+dist/
+*.log
 .env
+repomix-output.*
+pgdata/
+postgres_data/

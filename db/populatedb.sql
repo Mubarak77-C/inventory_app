@@ -30,3 +30,15 @@ INSERT INTO items (name, description, category_id, price, stock_count) VALUES
   ('Chef Knife', '8-inch high carbon stainless steel knife', 1, 45.99, 12),
   ('Blender', 'Commercial grade heavy duty blender', 1, 120.50, 4),
   ('Cocktail Shaker', 'Stainless steel Boston shaker set', 2, 15.00, 25);
+
+  
+-- 4. Create chat_history table matching itemModel.js expectations
+DROP TABLE IF EXISTS chat_history;
+
+CREATE TABLE chat_history (
+  id SERIAL PRIMARY KEY,
+  user_question TEXT NOT NULL,
+  ai_response TEXT NOT NULL,
+  snapshot_data JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

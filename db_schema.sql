@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict OrMdAt7mJFrekcaAQdeBiX2PFHipUB5dV7jVdlhjzWcj64iOBe4KZ4Nn75vSvwn
+\restrict YtSHUqS2XPZPAImFrEnctKWbkEQyW7e8sj2HhHJMNGGzXJfW2AXcp4msqcHIx7v
 
 -- Dumped from database version 15.19
 -- Dumped by pg_dump version 15.19
@@ -65,7 +65,8 @@ CREATE TABLE public.chat_history (
     id integer NOT NULL,
     user_question text NOT NULL,
     ai_response text NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    snapshot_data jsonb
 );
 
 
@@ -196,5 +197,5 @@ ALTER TABLE ONLY public.items
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OrMdAt7mJFrekcaAQdeBiX2PFHipUB5dV7jVdlhjzWcj64iOBe4KZ4Nn75vSvwn
+\unrestrict YtSHUqS2XPZPAImFrEnctKWbkEQyW7e8sj2HhHJMNGGzXJfW2AXcp4msqcHIx7v
 

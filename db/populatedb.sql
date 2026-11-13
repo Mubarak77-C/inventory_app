@@ -39,5 +39,6 @@ CREATE TABLE chat_history (
   id SERIAL PRIMARY KEY,
   user_question TEXT NOT NULL,
   ai_response TEXT NOT NULL,
+  snapshot_data JSONB,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -1,4 +1,4 @@
-name: CI Build & Docker Check
+name: CI Build & Smoke Test
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  build-and-verify:
+  build-and-smoke-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -26,11 +26,31 @@ jobs:
       - name: Verify app.js syntax
         run: node --check app.js
 
-      - name: Test Docker image build
+      - name: Build Docker image
         run: docker build -t inventory-app-test .
 
-      - name: Validate docker-compose.yml syntax
-        env:
-          DB_PASSWORD: test_ci_password
-          GEMINI_API_KEY: test_ci_key
-        run: docker compose config --quiet
+      - name: Start PostgreSQL & App for Smoke Test
+        run: |
+          docker network create test-net
+          docker run -d --name test-postgres --network test-net \
+            -e POSTGRES_USER=my_user \
+            -e POSTGRES_PASSWORD=test_ci_password \
+            -e POSTGRES_DB=inventory_db \
+            postgres:15-alpine
+          sleep 5
+          docker exec -i test-postgres psql -U my_user -d inventory_db < db/populatedb.sql
+          docker run -d --name test-app --network test-net -p 3000:3000 \
+            -e DATABASE_URL=postgresql://my_user:test_ci_password@test-postgres:5432/inventory_db \
+            -e GEMINI_API_KEY=test_ci_key \
+            -e PORT=3000 \
+            inventory-app-test
+          sleep 5
+
+      - name: Run HTTP Smoke Test on /items
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/items)
+          echo "HTTP Status returned: $STATUS"
+          if [ "$STATUS" -ne 200 ]; then
+            docker logs test-app
+            exit 1
+          fi

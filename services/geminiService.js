@@ -179,6 +179,22 @@ Return ONLY a valid JSON object with these exact keys (no markdown code blocks, 
   }
 }
 
+async function generateEmbedding(text) {
+  try {
+    const response = await ai.models.embedContent({
+      model: "gemini-embedding-001",
+      contents: text,
+      config: {
+        outputDimensionality: 768,
+      },
+    });
+    return response.embeddings[0].values;
+  } catch (err) {
+    console.error("Error generating embedding:", err);
+    return null;
+  }
+}
+
 // Don't forget to export extractItemFromImage along with your other functions
 module.exports = {
   generateItemDescription,
@@ -186,4 +202,5 @@ module.exports = {
   generateRestockAdvice,
   askInventoryAssistant,
   extractItemFromImage,
+  generateEmbedding,
 };

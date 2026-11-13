@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ojyDvtsotiWCZaqZVijsKTbO6EmEhMsjygI7sGMPRZGO2X9XGrsymoIQFJJET5r
+\restrict OrMdAt7mJFrekcaAQdeBiX2PFHipUB5dV7jVdlhjzWcj64iOBe4KZ4Nn75vSvwn
 
 -- Dumped from database version 15.19
 -- Dumped by pg_dump version 15.19
@@ -64,7 +64,7 @@ ALTER SEQUENCE public.categories_id_seq OWNED BY public.categories.id;
 CREATE TABLE public.chat_history (
     id integer NOT NULL,
     user_question text NOT NULL,
-    ai_answer text NOT NULL,
+    ai_response text NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -196,5 +196,5 @@ ALTER TABLE ONLY public.items
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ojyDvtsotiWCZaqZVijsKTbO6EmEhMsjygI7sGMPRZGO2X9XGrsymoIQFJJET5r
+\unrestrict OrMdAt7mJFrekcaAQdeBiX2PFHipUB5dV7jVdlhjzWcj64iOBe4KZ4Nn75vSvwn
 

@@ -1,5 +1,8 @@
 -- db/populatedb.sql
 
+-- 0. Enable pgvector extension for semantic similarity search
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Drop tables if they exist so we can re-run this script safely if needed
 DROP TABLE IF EXISTS items;
 DROP TABLE IF EXISTS categories;
@@ -11,7 +14,7 @@ CREATE TABLE categories (
   description TEXT
 );
 
--- 2. Create Items Table with a Foreign Key linked to Categories
+-- 2. Create Items Table with a Foreign Key linked to Categories and pgvector embedding
 CREATE TABLE items (
   id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
@@ -19,7 +22,8 @@ CREATE TABLE items (
   category_id INT REFERENCES categories(id) ON DELETE CASCADE,
   price NUMERIC(10, 2) NOT NULL,
   stock_count INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  embedding vector(768)
 );
 
 -- 3. Insert Initial Dummy Data (Seed data)
@@ -32,7 +36,6 @@ INSERT INTO items (name, description, category_id, price, stock_count) VALUES
   ('Blender', 'Commercial grade heavy duty blender', 1, 120.50, 4),
   ('Cocktail Shaker', 'Stainless steel Boston shaker set', 2, 15.00, 25);
 
-  
 -- 4. Create chat_history table matching itemModel.js expectations
 DROP TABLE IF EXISTS chat_history;
 

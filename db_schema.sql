@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YtSHUqS2XPZPAImFrEnctKWbkEQyW7e8sj2HhHJMNGGzXJfW2AXcp4msqcHIx7v
+\restrict A2T9L23WLZ0ErRPno3s7jM7wH4EIdRGYXUDimgOQKrjoNQIjqibhY5mceEoVbmN
 
 -- Dumped from database version 15.19
 -- Dumped by pg_dump version 15.19
@@ -104,7 +104,8 @@ CREATE TABLE public.items (
     description text,
     category_id integer,
     price numeric(10,2) NOT NULL,
-    stock_count integer DEFAULT 0 NOT NULL
+    stock_count integer DEFAULT 0 NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -197,5 +198,5 @@ ALTER TABLE ONLY public.items
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YtSHUqS2XPZPAImFrEnctKWbkEQyW7e8sj2HhHJMNGGzXJfW2AXcp4msqcHIx7v
+\unrestrict A2T9L23WLZ0ErRPno3s7jM7wH4EIdRGYXUDimgOQKrjoNQIjqibhY5mceEoVbmN
 

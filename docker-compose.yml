@@ -19,13 +19,8 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
-<<<<<<< HEAD
       - DATABASE_URL=postgresql://my_user:${DB_PASSWORD}@postgres:5432/inventory_db
-      - GEMINI_API_KEY:${GEMINI_API_KEY}
-=======
-      - DATABASE_URL=postgresql://my_user:${DB_PASSWORD}@postgres:5432/inventory_db
-      - GEMINI_API_KEY:${GEMINI_API_KEY}
->>>>>>> 2c80b5f ("added repomix-output.*)
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - postgres
     restart: always

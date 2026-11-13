@@ -1,28 +1,29 @@
-version: "3.8"
-
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: inventory_postgres
-    environment:
-      POSTGRES_USER: my_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: inventory_db
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    restart: always
-
   app:
     build: .
     container_name: inventory_node_app
     ports:
       - "3000:3000"
     environment:
-      - PORT=3000
       - DATABASE_URL=postgresql://my_user:${DB_PASSWORD}@postgres:5432/inventory_db
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev
     depends_on:
       - postgres
+    restart: always
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: inventory_postgres
+    environment:
+      - POSTGRES_USER=my_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=inventory_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     restart: always
 
 volumes:

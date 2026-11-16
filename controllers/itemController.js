@@ -276,17 +276,43 @@ async function handleChatQuery(req, res) {
       return res.redirect("/items/chatbot");
     }
 
-    // 1. Fetch current items & categories for snapshot context
-    const allItems = await itemModel.getAllItems();
-    const categories = await categoryModel.getAllCategories();
+    const cleanQuestion = question.trim();
 
-    // 2. Ask Gemini with current context
-    const answer = await askInventoryAssistant(question, allItems, categories);
+    // 1. Embed the user's question & fetch categories + summary stats in parallel
+    const [questionEmbedding, categories, summaryStats] = await Promise.all([
+      generateEmbedding(cleanQuestion),
+      categoryModel.getAllCategories(),
+      itemModel.getInventorySummary(),
+    ]);
 
-    // 3. Save to database with a snapshot of the inventory state at this exact timestamp
+    // 2. Vector RAG Retrieval: fetch ONLY semantically relevant items via pgvector
+    let relevantItems = [];
+    if (questionEmbedding) {
+      relevantItems = await itemModel.semanticSearchItems(
+        questionEmbedding,
+        cleanQuestion,
+      );
+    }
+
+    // Fallback: if question is broad (e.g., "give me an overview") and vector search
+    // returns 0 items above the 0.57 threshold, load top 10 items so Gemini has context
+    if (relevantItems.length === 0) {
+      relevantItems = await itemModel.getFilteredItems("", "", "", 10, 0);
+    }
+
+    // 3. Ask Gemini with ONLY the retrieved relevant items (keeps Array format compatible!)
+    const answer = await askInventoryAssistant(
+      cleanQuestion,
+      relevantItems,
+      categories,
+    );
+
+    // 4. Save to database with a snapshot matching your original schema + summary stats
     const snapshotData = {
-      itemCount: allItems.length,
-      items: allItems.map((i) => ({
+      itemCount: summaryStats.total_unique_items,
+      retrievedCount: relevantItems.length,
+      totalInventoryValue: summaryStats.total_inventory_value,
+      items: relevantItems.map((i) => ({
         name: i.name,
         stock: i.stock_count,
         price: i.price,
@@ -294,7 +320,7 @@ async function handleChatQuery(req, res) {
       })),
     };
 
-    await itemModel.saveChatMessage(question, answer, snapshotData);
+    await itemModel.saveChatMessage(cleanQuestion, answer, snapshotData);
 
     res.redirect("/items/chatbot");
   } catch (err) {

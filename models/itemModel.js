@@ -177,18 +177,40 @@ async function clearChatHistory() {
   await pool.query(query);
 }
 
-async function semanticSearchItems(queryEmbedding, searchTerm = "") {
-  const sqlVector = JSON.stringify(queryEmbedding);
-  const query = `
-    SELECT items.*, categories.name AS category_name,
-           1 - (items.embedding <=> $1::vector) AS similarity
-    FROM items
-    LEFT JOIN categories ON items.category_id = categories.id
-    WHERE items.embedding IS NOT NULL
-      AND (1 - (items.embedding <=> $1::vector) > 0.45 OR items.name ILIKE $2)
-    ORDER BY items.embedding <=> $1::vector ASC;
-  `;
-  const { rows } = await pool.query(query, [sqlVector, `%${searchTerm}%`]);
+// async function semanticSearchItems(queryEmbedding, searchTerm = "") {
+//   const sqlVector = JSON.stringify(queryEmbedding);
+//   const query = `
+//     SELECT items.*, categories.name AS category_name,
+//            1 - (items.embedding <=> $1::vector) AS similarity
+//     FROM items
+//     LEFT JOIN categories ON items.category_id = categories.id
+//     WHERE items.embedding IS NOT NULL
+//       AND (1 - (items.embedding <=> $1::vector) > 0.45 OR items.name ILIKE $2)
+//     ORDER BY items.embedding <=> $1::vector ASC;
+//   `;
+//   const { rows } = await pool.query(query, [sqlVector, `%${searchTerm}%`]);
+//   return rows;
+// }
+
+async function semanticSearchItems(queryEmbedding, searchTerm) {
+  const vectorSql = JSON.stringify(queryEmbedding);
+  const minSimilarity = 0.5; // Adjust between 0.45 (looser) and 0.60 (stricter)
+
+  const { rows } = await pool.query(
+    `SELECT 
+       items.*,
+       categories.name AS category_name,
+       1 - (items.embedding <=> $1::vector) AS similarity
+     FROM items
+     LEFT JOIN categories ON items.category_id = categories.id
+     WHERE (items.embedding IS NOT NULL AND (1 - (items.embedding <=> $1::vector)) >= $2)
+        OR items.name ILIKE $3
+        OR items.description ILIKE $3
+     ORDER BY similarity DESC NULLS LAST
+     LIMIT 10`,
+    [vectorSql, minSimilarity, `%${searchTerm.trim()}%`],
+  );
+
   return rows;
 }
 

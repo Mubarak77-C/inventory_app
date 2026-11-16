@@ -16,6 +16,12 @@ async function insertCategory(name, description) {
   const { rows } = await pool.query(query, values);
   return rows[0];
 }
+async function getCategoryById(id) {
+  const { rows } = await pool.query("SELECT * FROM categories WHERE id = $1", [
+    id,
+  ]);
+  return rows[0];
+}
 
 // Add this function to models/categoryModel.js
 async function deleteCategory(id) {
@@ -28,5 +34,6 @@ async function deleteCategory(id) {
 module.exports = {
   getAllCategories,
   insertCategory,
+  getCategoryById,
   deleteCategory, // <-- Export delete
 };

@@ -326,6 +326,19 @@ async function getSimilarItems(itemId, limit = 3) {
   return rows;
 }
 
+async function getInventorySummary() {
+  const { rows } = await pool.query(`
+    SELECT 
+      COUNT(*)::int AS total_unique_items,
+      COALESCE(SUM(stock_count), 0)::int AS total_units_in_stock,
+      COALESCE(SUM(price * stock_count), 0)::numeric(12, 2) AS total_inventory_value,
+      COUNT(*) FILTER (WHERE stock_count = 0)::int AS out_of_stock_count,
+      COUNT(*) FILTER (WHERE stock_count > 0 AND stock_count <= 5)::int AS low_stock_count
+    FROM items
+  `);
+  return rows[0];
+}
+
 module.exports = {
   getAllItems,
   insertItem,
@@ -342,4 +355,5 @@ module.exports = {
   getFilteredItems,
   getFilteredItemCount,
   getSimilarItems,
+  getInventorySummary,
 };

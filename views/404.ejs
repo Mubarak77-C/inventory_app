@@ -4,36 +4,98 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title><%= locals.title || 'Page Not Found' %></title>
-    <script src="https://tailwindcss.com"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background-color: #f9fafb;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+      }
+      .card {
+        max-width: 28rem;
+        width: 100%;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        padding: 2rem;
+        text-align: center;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 3rem;
+        height: 3rem;
+        border-radius: 9999px;
+        background-color: #fef2f2;
+        color: #dc2626;
+        font-weight: 700;
+        font-size: 1.125rem;
+        margin-bottom: 1rem;
+      }
+      h1 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #111827;
+      }
+      p {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-top: 0.5rem;
+        line-height: 1.5;
+      }
+      .actions {
+        margin-top: 1.5rem;
+        display: flex;
+        justify-content: center;
+        gap: 0.75rem;
+      }
+      .btn-primary {
+        padding: 0.5rem 1rem;
+        background-color: #4f46e5;
+        color: #ffffff;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-radius: 0.5rem;
+        text-decoration: none;
+      }
+      .btn-primary:hover {
+        background-color: #4338ca;
+      }
+      .btn-secondary {
+        padding: 0.5rem 1rem;
+        background-color: #f3f4f6;
+        color: #374151;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-radius: 0.5rem;
+        text-decoration: none;
+      }
+      .btn-secondary:hover {
+        background-color: #e5e7eb;
+      }
+    </style>
   </head>
-  <body class="bg-gray-50 min-h-screen flex items-center justify-center p-6">
-    <div
-      class="max-w-md w-full bg-white rounded-xl border border-gray-200 shadow-sm p-8 text-center"
-    >
-      <div
-        class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-50 text-red-600 font-bold text-lg mb-4"
-      >
-        404
-      </div>
-      <h1 class="text-xl font-bold text-gray-900">
-        <%= locals.heading || 'Not Found' %>
-      </h1>
-      <p class="text-sm text-gray-500 mt-2">
-        <%= locals.message || 'Resource not found.' %>
-      </p>
-      <div class="mt-6 flex items-center justify-center gap-3">
-        <a
-          href="/items"
-          class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
-        >
-          Back to Dashboard
-        </a>
-        <a
-          href="/categories"
-          class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition"
-        >
-          View Categories
-        </a>
+  <body>
+    <div class="card">
+      <div class="badge">404</div>
+      <h1><%= locals.heading || 'Not Found' %></h1>
+      <p><%= locals.message || 'Resource not found.' %></p>
+      <div class="actions">
+        <a href="/items" class="btn-primary">Back to Dashboard</a>
+        <a href="/categories" class="btn-secondary">View Categories</a>
       </div>
     </div>
   </body>

@@ -10,15 +10,14 @@ const {
 
 const { generateInventoryPDF } = require("../services/pdfService");
 
-// controllers/itemController.js
 async function getItemsList(req, res) {
   try {
     const searchTerm = req.query.search || "";
+    const selectedCategory = req.query.category || "";
+    const maxPrice = req.query.maxPrice || "";
     const page = parseInt(req.query.page, 10) || 1;
     const limit = 10;
     const offset = (page - 1) * limit;
-
-    //semantic search
 
     let items = [];
     let totalItems = 0;
@@ -27,31 +26,52 @@ async function getItemsList(req, res) {
     if (searchTerm.trim() !== "") {
       const queryEmbedding = await generateEmbedding(searchTerm);
       if (queryEmbedding) {
-        items = await itemModel.semanticSearchItems(queryEmbedding, searchTerm);
+        items = await itemModel.semanticSearchItems(
+          queryEmbedding,
+          searchTerm,
+          selectedCategory,
+          maxPrice,
+        );
         totalItems = items.length;
         totalPages = 1;
       } else {
-        items = await itemModel.getPaginatedItems(searchTerm, limit, offset);
-        totalItems = await itemModel.getTotalItemCount(searchTerm);
+        items = await itemModel.getFilteredItems(
+          searchTerm,
+          selectedCategory,
+          maxPrice,
+          limit,
+          offset,
+        );
+        totalItems = await itemModel.getFilteredItemCount(
+          searchTerm,
+          selectedCategory,
+          maxPrice,
+        );
         totalPages = Math.ceil(totalItems / limit) || 1;
       }
     } else {
-      // 1. Fetch paginated items for the table
-      items = await itemModel.getPaginatedItems(searchTerm, limit, offset);
-      totalItems = await itemModel.getTotalItemCount(searchTerm);
+      items = await itemModel.getFilteredItems(
+        "",
+        selectedCategory,
+        maxPrice,
+        limit,
+        offset,
+      );
+      totalItems = await itemModel.getFilteredItemCount(
+        "",
+        selectedCategory,
+        maxPrice,
+      );
       totalPages = Math.ceil(totalItems / limit) || 1;
     }
 
-    // 2. Fetch ALL items & categories for calculating executive metrics and charts
     const allItems = await itemModel.getAllItems();
     const categories = await categoryModel.getAllCategories();
 
-    // 3. Calculate total inventory asset value
     const totalInventoryValue = allItems.reduce((sum, item) => {
       return sum + Number(item.price) * Number(item.stock_count || 0);
     }, 0);
 
-    // 4. Calculate category breakdown for Chart.js
     const categoryData = categories.map((cat) => {
       const catItems = allItems.filter((i) => i.category_id === cat.id);
       const stockSum = catItems.reduce(
@@ -70,21 +90,24 @@ async function getItemsList(req, res) {
       };
     });
 
-    // 5. Render index view with all required analytics data
     res.render("index", {
       items,
+      categories,
+      selectedCategory,
+      maxPrice,
       totalInventoryValue,
       searchTerm,
       currentPage: page,
       totalPages,
       title: "Inventory Dashboard",
-      categoryData, // <-- Passed to view for Chart.js
+      categoryData,
     });
   } catch (err) {
     console.error("Error in itemController (getItemsList):", err);
     res.status(500).send("Internal Server Error");
   }
 }
+
 async function renderNewItemForm(req, res) {
   try {
     const categories = await categoryModel.getAllCategories();

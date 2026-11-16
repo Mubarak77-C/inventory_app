@@ -177,9 +177,27 @@ async function clearChatHistory() {
   await pool.query(query);
 }
 
-async function semanticSearchItems(queryEmbedding, searchTerm) {
+async function semanticSearchItems(
+  queryEmbedding,
+  searchTerm,
+  categoryId = "",
+  maxPrice = "",
+) {
   const vectorSql = JSON.stringify(queryEmbedding);
-  const minSimilarity = 0.57; // 0.5 soAdjust between 0.45 (looser) and 0.60 (stricter) // 0.57 Filters out weak 50%-56% background noise
+  const minSimilarity = 0.57;
+
+  const params = [vectorSql, minSimilarity, `%${searchTerm.trim()}%`];
+  let filterClauses = "";
+
+  if (categoryId) {
+    params.push(Number(categoryId));
+    filterClauses += ` AND items.category_id = $${params.length}`;
+  }
+
+  if (maxPrice !== "" && !isNaN(Number(maxPrice))) {
+    params.push(Number(maxPrice));
+    filterClauses += ` AND items.price <= $${params.length}`;
+  }
 
   const { rows } = await pool.query(
     `SELECT 
@@ -188,15 +206,101 @@ async function semanticSearchItems(queryEmbedding, searchTerm) {
        1 - (items.embedding <=> $1::vector) AS similarity
      FROM items
      LEFT JOIN categories ON items.category_id = categories.id
-     WHERE (items.embedding IS NOT NULL AND (1 - (items.embedding <=> $1::vector)) >= $2)
-        OR items.name ILIKE $3
-        OR items.description ILIKE $3
+     WHERE (
+       (items.embedding IS NOT NULL AND (1 - (items.embedding <=> $1::vector)) >= $2)
+       OR items.name ILIKE $3
+       OR items.description ILIKE $3
+     )
+     ${filterClauses}
      ORDER BY similarity DESC NULLS LAST
      LIMIT 10`,
-    [vectorSql, minSimilarity, `%${searchTerm.trim()}%`],
+    params,
   );
 
   return rows;
+}
+
+async function getFilteredItems(
+  searchTerm = "",
+  categoryId = "",
+  maxPrice = "",
+  limit = 10,
+  offset = 0,
+) {
+  const params = [];
+  const conditions = [];
+
+  if (searchTerm.trim() !== "") {
+    params.push(`%${searchTerm.trim()}%`);
+    conditions.push(
+      `(items.name ILIKE $${params.length} OR items.description ILIKE $${params.length})`,
+    );
+  }
+
+  if (categoryId) {
+    params.push(Number(categoryId));
+    conditions.push(`items.category_id = $${params.length}`);
+  }
+
+  if (maxPrice !== "" && !isNaN(Number(maxPrice))) {
+    params.push(Number(maxPrice));
+    conditions.push(`items.price <= $${params.length}`);
+  }
+
+  const whereSQL =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  params.push(limit, offset);
+  const limitIdx = params.length - 1;
+  const offsetIdx = params.length;
+
+  const { rows } = await pool.query(
+    `SELECT items.*, categories.name AS category_name
+     FROM items
+     LEFT JOIN categories ON items.category_id = categories.id
+     ${whereSQL}
+     ORDER BY items.id DESC
+     LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+    params,
+  );
+
+  return rows;
+}
+
+async function getFilteredItemCount(
+  searchTerm = "",
+  categoryId = "",
+  maxPrice = "",
+) {
+  const params = [];
+  const conditions = [];
+
+  if (searchTerm.trim() !== "") {
+    params.push(`%${searchTerm.trim()}%`);
+    conditions.push(
+      `(items.name ILIKE $${params.length} OR items.description ILIKE $${params.length})`,
+    );
+  }
+
+  if (categoryId) {
+    params.push(Number(categoryId));
+    conditions.push(`items.category_id = $${params.length}`);
+  }
+
+  if (maxPrice !== "" && !isNaN(Number(maxPrice))) {
+    params.push(Number(maxPrice));
+    conditions.push(`items.price <= $${params.length}`);
+  }
+
+  const whereSQL =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const { rows } = await pool.query(
+    `SELECT COUNT(*) AS count FROM items ${whereSQL}`,
+    params,
+  );
+
+  return Number(rows[0].count);
 }
 
 module.exports = {
@@ -212,4 +316,6 @@ module.exports = {
   getChatHistory,
   clearChatHistory,
   semanticSearchItems,
+  getFilteredItems,
+  getFilteredItemCount,
 };

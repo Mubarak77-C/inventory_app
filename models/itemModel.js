@@ -303,6 +303,29 @@ async function getFilteredItemCount(
   return Number(rows[0].count);
 }
 
+async function getSimilarItems(itemId, limit = 3) {
+  const { rows } = await pool.query(
+    `SELECT 
+       other.id,
+       other.name,
+       other.price,
+       other.stock_count,
+       categories.name AS category_name,
+       1 - (other.embedding <=> target.embedding) AS similarity
+     FROM items AS other
+     CROSS JOIN (SELECT embedding FROM items WHERE id = $1) AS target
+     LEFT JOIN categories ON other.category_id = categories.id
+     WHERE other.id != $1
+       AND other.embedding IS NOT NULL
+       AND target.embedding IS NOT NULL
+       AND (1 - (other.embedding <=> target.embedding)) >= 0.50
+     ORDER BY other.embedding <=> target.embedding ASC
+     LIMIT $2`,
+    [itemId, limit],
+  );
+  return rows;
+}
+
 module.exports = {
   getAllItems,
   insertItem,
@@ -318,4 +341,5 @@ module.exports = {
   semanticSearchItems,
   getFilteredItems,
   getFilteredItemCount,
+  getSimilarItems,
 };

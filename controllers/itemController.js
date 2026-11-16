@@ -153,18 +153,25 @@ async function createItem(req, res) {
 
 async function renderEditItemForm(req, res) {
   try {
-    const { id } = req.params;
-    const item = await itemModel.getItemById(id);
-    const categories = await categoryModel.getAllCategories();
+    const [item, categories, similarItems] = await Promise.all([
+      itemModel.getItemById(id),
+      categoryModel.getAllCategories(),
+      itemModel.getSimilarItems(id, 3),
+    ]);
 
     if (!item) {
-      return res.status(404).send("Item not found.");
+      return res.status(404).render("404", {
+        title: "Item Not Found",
+        heading: "Item Not Found",
+        message: `Item #${id} does not exist.`,
+      });
     }
 
     res.render("editItem", {
       item,
       categories,
-      title: "Edit Item", // <-- Passed here
+      similarItems,
+      title: "Edit Item",
     });
   } catch (err) {
     console.error("Error in itemController (renderEditItemForm):", err);

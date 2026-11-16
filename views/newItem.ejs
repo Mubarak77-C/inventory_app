@@ -229,16 +229,33 @@ document.getElementById('scanImageBtn').addEventListener('click', async () => {
       body: formData
     });
 
-    const data = await response.json();
-    if (data) {
-      if (data.name) document.getElementById('name').value = data.name;
+     const data = await response.json();
+    if (data && data.name) {
+      document.getElementById('name').value = data.name;
       if (data.description) document.getElementById('description').value = data.description;
       if (data.price) document.querySelector('input[name="price"]').value = data.price;
       if (data.stock_count) document.getElementById('stock_count').value = data.stock_count;
-      alert('✨ Form auto-filled successfully from image scan!');
+
+      // Also auto-select the matching category right after image scan
+      if (data.category_id) {
+        document.getElementById('category_id').value = data.category_id;
+      } else {
+        const catRes = await fetch('/items/suggest-category', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: data.name })
+        });
+        const catData = await catRes.json();
+        if (catData.categoryId) {
+          document.getElementById('category_id').value = catData.categoryId;
+        }
+      }
+
+      alert('✨ Form auto-filled (including category) from image scan!');
     } else {
       alert('Could not extract details from this image.');
     }
+
   } catch (err) {
     console.error(err);
     alert('Error uploading or scanning image.');

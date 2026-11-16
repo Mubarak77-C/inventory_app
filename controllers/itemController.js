@@ -153,6 +153,7 @@ async function createItem(req, res) {
 
 async function renderEditItemForm(req, res) {
   try {
+    const { id } = req.params;
     const [item, categories, similarItems] = await Promise.all([
       itemModel.getItemById(id),
       categoryModel.getAllCategories(),

@@ -50,10 +50,16 @@ async function getCategoryItems(req, res) {
       return sum + Number(item.price) * Number(item.stock_count || 0);
     }, 0);
 
+    const allCategories = await categoryModel.getAllCategories();
+
     res.render("index", {
       items,
       totalInventoryValue,
       title: `${targetCategory.name} Inventory`, // <-- Passed dynamically here
+      categories: allCategories,
+      selectedCategory: req.params.id,
+      searchTerm: "",
+      maxPrice: "",
     });
   } catch (err) {
     console.error("Error in categoryController (getCategoryItems):", err);

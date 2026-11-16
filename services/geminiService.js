@@ -106,40 +106,40 @@ ${itemList}`;
   }
 }
 
-// Add this function to services/geminiService.js
-async function askInventoryAssistant(userQuestion, allItems, categories) {
-  try {
-    // Format inventory items into text context for Gemini (including ID and timestamp)
-    const inventoryContext = allItems
-      .map(
-        (item) =>
-          `ID: ${item.id}, Name: ${item.name}, Category: ${item.category_name || "Uncategorized"}, Price: $${item.price}, Stock: ${item.stock_count}, Added At: ${item.created_at || "Unknown"}, Description: ${item.description || "None"}`,
-      )
-      .join("\n");
+// // Add this function to services/geminiService.js
+// async function askInventoryAssistant(userQuestion, allItems, categories) {
+//   try {
+//     // Format inventory items into text context for Gemini (including ID and timestamp)
+//     const inventoryContext = allItems
+//       .map(
+//         (item) =>
+//           `ID: ${item.id}, Name: ${item.name}, Category: ${item.category_name || "Uncategorized"}, Price: $${item.price}, Stock: ${item.stock_count}, Added At: ${item.created_at || "Unknown"}, Description: ${item.description || "None"}`,
+//       )
+//       .join("\n");
 
-    const categoryContext = categories.map((c) => c.name).join(", ");
+//     const categoryContext = categories.map((c) => c.name).join(", ");
 
-    const prompt = `You are an expert AI Inventory & Restaurant Manager Assistant. 
-You have access to the current database records below (ordered newest to oldest by ID and Added At timestamp). Answer the user's question clearly, professionally, and concisely based ONLY on this data. If you don't know or the item isn't listed, state that politely.
+//     const prompt = `You are an expert AI Inventory & Restaurant Manager Assistant.
+// You have access to the current database records below (ordered newest to oldest by ID and Added At timestamp). Answer the user's question clearly, professionally, and concisely based ONLY on this data. If you don't know or the item isn't listed, state that politely.
 
-Available Categories: ${categoryContext}
+// Available Categories: ${categoryContext}
 
-Current Inventory Records:
-${inventoryContext}
+// Current Inventory Records:
+// ${inventoryContext}
 
-User Question: "${userQuestion}"`;
+// User Question: "${userQuestion}"`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash-lite",
-      contents: prompt,
-    });
+//     const response = await ai.models.generateContent({
+//       model: "gemini-3.5-flash-lite",
+//       contents: prompt,
+//     });
 
-    return response.text.trim();
-  } catch (err) {
-    console.error("Error in AI chatbot assistant:", err);
-    return "Sorry, I am having trouble connecting to the inventory assistant right now.";
-  }
-}
+//     return response.text.trim();
+//   } catch (err) {
+//     console.error("Error in AI chatbot assistant:", err);
+//     return "Sorry, I am having trouble connecting to the inventory assistant right now.";
+//   }
+// }
 
 async function extractItemFromImage(imageBuffer, mimeType) {
   try {
@@ -195,7 +195,61 @@ async function generateEmbedding(text) {
   }
 }
 
-// Don't forget to export extractItemFromImage along with your other functions
+async function generateWithRetry(ai, params, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await ai.models.generateContent(params);
+    } catch (err) {
+      const isTransient = err.status === 503 || err.status === 429;
+      if (!isTransient || attempt === maxRetries) {
+        throw err;
+      }
+      const delayMs = 1000 * Math.pow(2, attempt - 1);
+      console.warn(
+        `Gemini API busy (${err.status}). Retrying in ${delayMs}ms (attempt ${attempt}/${maxRetries})...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
+async function askInventoryAssistant(userQuestion, allItems, categories) {
+  try {
+    // Format inventory items into text context for Gemini (including ID and timestamp)
+    const inventoryContext = allItems
+      .map(
+        (item) =>
+          `ID: ${item.id}, Name: ${item.name}, Category: ${item.category_name || "Uncategorized"}, Price: $${item.price}, Stock: ${item.stock_count}, Added At: ${item.created_at || "Unknown"}, Description: ${item.description || "None"}`,
+      )
+      .join("\n");
+
+    const categoryContext = categories.map((c) => c.name).join(", ");
+
+    const prompt = `You are an expert AI Inventory & Restaurant Manager Assistant. 
+You have access to the current database records below (ordered newest to oldest by ID and Added At timestamp). Answer the user's question clearly, professionally, and concisely based ONLY on this data. If you don't know or the item isn't listed, state that politely.
+
+Available Categories: ${categoryContext}
+
+Current Inventory Records:
+${inventoryContext}
+
+User Question: "${userQuestion}"`;
+
+    const response = await generateWithRetry(ai, {
+      model: "gemini-3.5-flash-lite",
+      contents: prompt,
+    });
+
+    return response.text.trim();
+  } catch (err) {
+    console.error("Error in AI chatbot assistant:", err);
+    if (err.status === 503 || err.status === 429) {
+      return "⚠️ Gemini AI is temporarily experiencing high demand. Please try asking again in a few seconds.";
+    }
+    return "Sorry, I am having trouble connecting to the inventory assistant right now.";
+  }
+}
+
 module.exports = {
   generateItemDescription,
   suggestCategory,
@@ -203,4 +257,5 @@ module.exports = {
   askInventoryAssistant,
   extractItemFromImage,
   generateEmbedding,
+  generateWithRetry,
 };

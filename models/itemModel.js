@@ -339,6 +339,28 @@ async function getInventorySummary() {
   return rows[0];
 }
 
+async function ragSearchItems(queryEmbedding, searchTerm, limit = 15) {
+  const vectorSql = JSON.stringify(queryEmbedding);
+  const minSimilarity = 0.45; // Looser cutoff so multi-topic questions catch all candidates
+
+  const { rows } = await pool.query(
+    `SELECT 
+       items.*,
+       categories.name AS category_name,
+       1 - (items.embedding <=> $1::vector) AS similarity
+     FROM items
+     LEFT JOIN categories ON items.category_id = categories.id
+     WHERE (items.embedding IS NOT NULL AND (1 - (items.embedding <=> $1::vector)) >= $2)
+        OR items.name ILIKE $3
+        OR items.description ILIKE $3
+     ORDER BY similarity DESC NULLS LAST
+     LIMIT $4`,
+    [vectorSql, minSimilarity, `%${searchTerm.trim()}%`, limit],
+  );
+
+  return rows;
+}
+
 module.exports = {
   getAllItems,
   insertItem,
@@ -356,4 +378,5 @@ module.exports = {
   getFilteredItemCount,
   getSimilarItems,
   getInventorySummary,
+  ragSearchItems,
 };

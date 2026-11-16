@@ -291,6 +291,7 @@ async function handleChatQuery(req, res) {
       relevantItems = await itemModel.semanticSearchItems(
         questionEmbedding,
         cleanQuestion,
+        15,
       );
     }
 

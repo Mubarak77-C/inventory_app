@@ -341,7 +341,7 @@ async function getInventorySummary() {
 
 async function ragSearchItems(queryEmbedding, searchTerm, limit = 15) {
   const vectorSql = JSON.stringify(queryEmbedding);
-  const minSimilarity = 0.45; // Looser cutoff so multi-topic questions catch all candidates
+  const minSimilarity = 0.35; //  Conversational questions have lower cosine scores than short keywords, 0.45Looser cutoff so multi-topic questions catch all candidates
 
   const { rows } = await pool.query(
     `SELECT 

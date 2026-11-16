@@ -288,7 +288,7 @@ async function handleChatQuery(req, res) {
     // 2. Vector RAG Retrieval: fetch ONLY semantically relevant items via pgvector
     let relevantItems = [];
     if (questionEmbedding) {
-      relevantItems = await itemModel.semanticSearchItems(
+      relevantItems = await itemModel.ragSearchItems(
         questionEmbedding,
         cleanQuestion,
         15,

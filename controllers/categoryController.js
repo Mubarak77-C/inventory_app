@@ -37,8 +37,7 @@ async function createCategory(req, res) {
 async function getCategoryItems(req, res) {
   try {
     const { id } = req.params;
-    const categories = await categoryModel.getAllCategories();
-    // 2.1: Check BEFORE querying PostgreSQL so non-numeric IDs (like /categories/abc/items) don't crash DB
+
     if (isNaN(Number(id))) {
       return res.status(400).render("404", {
         title: "Invalid Category ID",
@@ -47,9 +46,9 @@ async function getCategoryItems(req, res) {
       });
     }
 
+    // 1. Fetch ONLY the single category first (fast lookup)
     const category = await categoryModel.getCategoryById(id);
 
-    // 2.2: Replace your old `res.status(404).send("Category not found.")` right here
     if (!category) {
       return res.status(404).render("404", {
         title: "Category Not Found",
@@ -58,24 +57,20 @@ async function getCategoryItems(req, res) {
       });
     }
 
-    const targetCategory = categories.find((cat) => cat.id === parseInt(id));
-
-    if (!targetCategory) {
-      return res.status(404).send("Category not found.");
-    }
-
-    const items = await itemModel.getItemsByCategory(id);
+    // 2. Fetch items and categories in parallel once we know the category exists
+    const [items, allCategories] = await Promise.all([
+      itemModel.getItemsByCategory(id),
+      categoryModel.getAllCategories(),
+    ]);
 
     const totalInventoryValue = items.reduce((sum, item) => {
       return sum + Number(item.price) * Number(item.stock_count || 0);
     }, 0);
 
-    const allCategories = await categoryModel.getAllCategories();
-
     res.render("index", {
       items,
       totalInventoryValue,
-      title: `${targetCategory.name} Inventory`, // <-- Passed dynamically here
+      title: `${category.name} Inventory`,
       categories: allCategories,
       selectedCategory: req.params.id,
       searchTerm: "",

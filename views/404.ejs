@@ -1,30 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title><%= locals.title || 'Page Not Found' %></title>
-  <script src="https://tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center p-6">
-  <div class="max-w-md w-full bg-white rounded-xl border border-gray-200 shadow-sm p-8 text-center">
-    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-50 text-red-600 font-bold text-lg mb-4">
-      404
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= locals.title || 'Page Not Found' %></title>
+    <script src="https://tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-50 min-h-screen flex items-center justify-center p-6">
+    <div
+      class="max-w-md w-full bg-white rounded-xl border border-gray-200 shadow-sm p-8 text-center"
+    >
+      <div
+        class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-50 text-red-600 font-bold text-lg mb-4"
+      >
+        404
+      </div>
+      <h1 class="text-xl font-bold text-gray-900">
+        <%= locals.heading || 'Not Found' %>
+      </h1>
+      <p class="text-sm text-gray-500 mt-2">
+        <%= locals.message || 'Resource not found.' %>
+      </p>
+      <div class="mt-6 flex items-center justify-center gap-3">
+        <a
+          href="/items"
+          class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
+        >
+          Back to Dashboard
+        </a>
+        <a
+          href="/categories"
+          class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition"
+        >
+          View Categories
+        </a>
+      </div>
     </div>
-    <h1 class="text-xl font-bold text-gray-900">
-      <%= locals.heading || 'Not Found' %>
-    </h1>
-    <p class="text-sm text-gray-500 mt-2">
-      <%= locals.message || 'The resource you are looking for does not exist or may have been deleted.' %>
-    </p>
-    <div class="mt-6 flex items-center justify-center gap-3">
-      <a href="/items" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
-        Back to Dashboard
-      </a>
-      <a href="/categories" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition">
-        View Categories
-      </a>
-    </div>
-  </div>
-</body>
+  </body>
 </html>

@@ -20,7 +20,7 @@ async function getCategoryById(id) {
   const { rows } = await pool.query("SELECT * FROM categories WHERE id = $1", [
     id,
   ]);
-  return rows[0];
+  return rows[0]; // Must return the single row (or undefined), not an empty array []!
 }
 
 // Add this function to models/categoryModel.js

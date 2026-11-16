@@ -177,24 +177,9 @@ async function clearChatHistory() {
   await pool.query(query);
 }
 
-// async function semanticSearchItems(queryEmbedding, searchTerm = "") {
-//   const sqlVector = JSON.stringify(queryEmbedding);
-//   const query = `
-//     SELECT items.*, categories.name AS category_name,
-//            1 - (items.embedding <=> $1::vector) AS similarity
-//     FROM items
-//     LEFT JOIN categories ON items.category_id = categories.id
-//     WHERE items.embedding IS NOT NULL
-//       AND (1 - (items.embedding <=> $1::vector) > 0.45 OR items.name ILIKE $2)
-//     ORDER BY items.embedding <=> $1::vector ASC;
-//   `;
-//   const { rows } = await pool.query(query, [sqlVector, `%${searchTerm}%`]);
-//   return rows;
-// }
-
 async function semanticSearchItems(queryEmbedding, searchTerm) {
   const vectorSql = JSON.stringify(queryEmbedding);
-  const minSimilarity = 0.5; // Adjust between 0.45 (looser) and 0.60 (stricter)
+  const minSimilarity = 0.57; // 0.5 soAdjust between 0.45 (looser) and 0.60 (stricter) // 0.57 Filters out weak 50%-56% background noise
 
   const { rows } = await pool.query(
     `SELECT 

@@ -321,15 +321,15 @@
     <% } %>
 
 
-    <!-- Pagination Bar -->
+   <!-- Pagination Bar -->
     <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
       <div class="mt-6 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-xl shadow-sm border">
         <div class="flex flex-1 justify-between sm:hidden">
           <% if (currentPage > 1) { %>
-            <a href="/items?page=<%= currentPage - 1 %><%= searchTerm ? '&search=' + searchTerm : '' %>" class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Previous</a>
+            <a href="/items?page=<%= currentPage - 1 %><%= locals.filterQuery || '' %>" class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Previous</a>
           <% } %>
           <% if (currentPage < totalPages) { %>
-            <a href="/items?page=<%= currentPage + 1 %><%= searchTerm ? '&search=' + searchTerm : '' %>" class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Next</a>
+            <a href="/items?page=<%= currentPage + 1 %><%= locals.filterQuery || '' %>" class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Next</a>
           <% } %>
         </div>
 
@@ -342,21 +342,21 @@
           <div>
             <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
               <% if (currentPage > 1) { %>
-                <a href="/items?page=<%= currentPage - 1 %><%= searchTerm ? '&search=' + searchTerm : '' %>" class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                <a href="/items?page=<%= currentPage - 1 %><%= locals.filterQuery || '' %>" class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
                   &larr; Prev
                 </a>
               <% } %>
 
               <% for(let i = 1; i <= totalPages; i++) { %>
                 <% if (i === currentPage) { %>
-                  <a href="/items?page=<%= i %><%= searchTerm ? '&search=' + searchTerm : '' %>" class="relative z-10 inline-flex items-center bg-indigo-600 px-4 py-2 text-sm font-semibold text-white"><%= i %></a>
+                  <a href="/items?page=<%= i %><%= locals.filterQuery || '' %>" class="relative z-10 inline-flex items-center bg-indigo-600 px-4 py-2 text-sm font-semibold text-white"><%= i %></a>
                 <% } else { %>
-                  <a href="/items?page=<%= i %><%= searchTerm ? '&search=' + searchTerm : '' %>" class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"><%= i %></a>
+                  <a href="/items?page=<%= i %><%= locals.filterQuery || '' %>" class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"><%= i %></a>
                 <% } %>
               <% } %>
 
               <% if (currentPage < totalPages) { %>
-                <a href="/items?page=<%= currentPage + 1 %><%= searchTerm ? '&search=' + searchTerm : '' %>" class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                <a href="/items?page=<%= currentPage + 1 %><%= locals.filterQuery || '' %>" class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
                   Next &rarr;
                 </a>
               <% } %>
@@ -365,6 +365,7 @@
         </div>
       </div>
     <% } %>
+
 
   </main>
 

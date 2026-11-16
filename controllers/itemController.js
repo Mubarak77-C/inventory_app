@@ -90,11 +90,20 @@ async function getItemsList(req, res) {
       };
     });
 
+    const queryParams = new URLSearchParams();
+    if (searchTerm.trim()) queryParams.set("search", searchTerm.trim());
+    if (selectedCategory) queryParams.set("category", selectedCategory);
+    if (maxPrice !== "") queryParams.set("maxPrice", maxPrice);
+    const filterQuery = queryParams.toString()
+      ? `&${queryParams.toString()}`
+      : "";
+
     res.render("index", {
       items,
       categories,
       selectedCategory,
       maxPrice,
+      filterQuery,
       totalInventoryValue,
       searchTerm,
       currentPage: page,

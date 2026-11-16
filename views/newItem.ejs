@@ -1,69 +1,4 @@
-<!-- views/newItem.ejs -->
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Add New Item</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 40px;
-        background: #f4f4f9;
-        color: #333;
-      }
-      .form-container {
-        background: white;
-        padding: 30px;
-        border-radius: 8px;
-        max-width: 500px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      }
-      h1 {
-        color: #2c3e50;
-        margin-top: 0;
-      }
-      label {
-        display: block;
-        margin-top: 15px;
-        font-weight: bold;
-      }
-      input,
-      textarea {
-        width: 100%;
-        padding: 8px;
-        margin-top: 5px;
-        box-sizing: border-box;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-      }
-      button {
-        background: #2c3e50;
-        color: white;
-        padding: 10px 15px;
-        border: none;
-        border-radius: 4px;
-        margin-top: 20px;
-        cursor: pointer;
-      }
-      button:hover {
-        background: #34495e;
-      }
-      a {
-        display: inline-block;
-        margin-top: 15px;
-        color: #3498db;
-        text-decoration: none;
-      }
-    </style>
-  </head>
-  <body>
 
-
-
-    <div class="form-container">
-        <!-- views/newItem.ejs -->
-<!-- views/newItem.ejs -->
 <%- include('partials/header', { title: 'Add New Item' }) %>
 
 <h1>📦 Add New Item</h1>
@@ -119,12 +54,8 @@
 
 <a href="/items" style="display: inline-block; margin-top: 15px; color: #3498db; text-decoration: none;">← Back to Inventory</a>
 
-<%- include('partials/footer') %>
-     
-    </div>
-  </body>
-</html>
 
+   
 
 
 <script>
@@ -266,3 +197,5 @@ document.getElementById('scanImageBtn').addEventListener('click', async () => {
 });
 
 </script>
+
+<%- include('partials/footer') %>

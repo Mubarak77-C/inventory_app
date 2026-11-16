@@ -38,6 +38,26 @@ async function getCategoryItems(req, res) {
   try {
     const { id } = req.params;
     const categories = await categoryModel.getAllCategories();
+    // 2.1: Check BEFORE querying PostgreSQL so non-numeric IDs (like /categories/abc/items) don't crash DB
+    if (isNaN(Number(id))) {
+      return res.status(400).render("404", {
+        title: "Invalid Category ID",
+        heading: "Invalid Category ID",
+        message: "The category ID in the URL must be a valid number.",
+      });
+    }
+
+    const category = await categoryModel.getCategoryById(id);
+
+    // 2.2: Replace your old `res.status(404).send("Category not found.")` right here
+    if (!category) {
+      return res.status(404).render("404", {
+        title: "Category Not Found",
+        heading: "Category Not Found",
+        message: `Category #${id} does not exist or may have been removed.`,
+      });
+    }
+
     const targetCategory = categories.find((cat) => cat.id === parseInt(id));
 
     if (!targetCategory) {

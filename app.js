@@ -23,6 +23,15 @@ app.use(express.json());
 // Any request starting with /items will go to itemRouter
 app.use("/items", itemRouter);
 app.use("/categories", categoryRouter);
+
+app.use((req, res) => {
+  res.status(404).render("404", {
+    title: "Page Not Found",
+    heading: "Page Not Found",
+    message: "We couldn't find the page you requested.",
+  });
+});
+
 // Root route fallback
 app.get("/", (req, res) => {
   res.send(

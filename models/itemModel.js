@@ -1,5 +1,6 @@
 // models/itemModel.js
 const pool = require("../db/pool");
+// const pgvector = require("pgvector");
 
 // models/itemModel.js
 async function getAllItems(searchTerm = "") {
@@ -21,16 +22,31 @@ async function getAllItems(searchTerm = "") {
   return rows;
 }
 
-// New function to insert an item into the database
-async function insertItem(name, description, category_id, price, stock_count) {
+// New function to insert an item into the database and for semantic serach which pg vector added with embedding
+async function insertItem(
+  name,
+  description,
+  category_id,
+  price,
+  stock_count,
+  embedding = null,
+) {
+  const sqlVector = embedding ? JSON.stringify(embedding) : null;
   const query = `
-    INSERT INTO items (name, description, category_id, price, stock_count)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO items (name, description, category_id, price, stock_count, embedding)
+    VALUES ($1, $2, $3, $4, $5, $6::vector)
     RETURNING *;
   `;
-  const values = [name, description, category_id, price, stock_count];
+  const values = [
+    name,
+    description,
+    category_id,
+    price,
+    stock_count,
+    sqlVector,
+  ];
   const { rows } = await pool.query(query, values);
-  return rows[0]; // Return the newly created row
+  return rows[0];
 }
 
 // models/itemModel.js (add this function to your existing exports)
@@ -54,17 +70,28 @@ async function updateItem(
   category_id,
   price,
   stock_count,
+  embedding = null,
 ) {
+  const sqlVector = embedding ? JSON.stringify(embedding) : null;
   const query = `
     UPDATE items 
-    SET name = $1, description = $2, category_id = $3, price = $4, stock_count = $5
-    WHERE id = $6
+    SET name = $1, description = $2, category_id = $3, price = $4, stock_count = $5, embedding = $6::vector
+    WHERE id = $7
     RETURNING *;
   `;
-  const values = [name, description, category_id, price, stock_count, id];
+  const values = [
+    name,
+    description,
+    category_id,
+    price,
+    stock_count,
+    sqlVector,
+    id,
+  ];
   const { rows } = await pool.query(query, values);
-  return rows[0]; // Returns undefined if ID doesn't exist
+  return rows[0];
 }
+
 // Replace your current getItemById with this:
 async function getItemById(id) {
   const query = `
@@ -150,6 +177,21 @@ async function clearChatHistory() {
   await pool.query(query);
 }
 
+async function semanticSearchItems(queryEmbedding, searchTerm = "") {
+  const sqlVector = JSON.stringify(queryEmbedding);
+  const query = `
+    SELECT items.*, categories.name AS category_name,
+           1 - (items.embedding <=> $1::vector) AS similarity
+    FROM items
+    LEFT JOIN categories ON items.category_id = categories.id
+    WHERE items.embedding IS NOT NULL
+      AND (1 - (items.embedding <=> $1::vector) > 0.45 OR items.name ILIKE $2)
+    ORDER BY items.embedding <=> $1::vector ASC;
+  `;
+  const { rows } = await pool.query(query, [sqlVector, `%${searchTerm}%`]);
+  return rows;
+}
+
 module.exports = {
   getAllItems,
   insertItem,
@@ -162,4 +204,5 @@ module.exports = {
   saveChatMessage,
   getChatHistory,
   clearChatHistory,
+  semanticSearchItems,
 };

@@ -1,9 +1,13 @@
 // controllers/itemController.js
 const itemModel = require("../models/itemModel");
 const categoryModel = require("../models/categoryModel");
-const { generateRestockAdvice } = require("../services/geminiService");
-const { askInventoryAssistant } = require("../services/geminiService");
-const { extractItemFromImage } = require("../services/geminiService");
+const {
+  generateRestockAdvice,
+  askInventoryAssistant,
+  extractItemFromImage,
+  generateEmbedding,
+} = require("../services/geminiService");
+
 const { generateInventoryPDF } = require("../services/pdfService");
 
 // controllers/itemController.js
@@ -14,10 +18,29 @@ async function getItemsList(req, res) {
     const limit = 10;
     const offset = (page - 1) * limit;
 
-    // 1. Fetch paginated items for the table
-    const items = await itemModel.getPaginatedItems(searchTerm, limit, offset);
-    const totalItems = await itemModel.getTotalItemCount(searchTerm);
-    const totalPages = Math.ceil(totalItems / limit) || 1;
+    //semantic search
+
+    let items = [];
+    let totalItems = 0;
+    let totalPages = 1;
+
+    if (searchTerm.trim() !== "") {
+      const queryEmbedding = await generateEmbedding(searchTerm);
+      if (queryEmbedding) {
+        items = await itemModel.semanticSearchItems(queryEmbedding, searchTerm);
+        totalItems = items.length;
+        totalPages = 1;
+      } else {
+        items = await itemModel.getPaginatedItems(searchTerm, limit, offset);
+        totalItems = await itemModel.getTotalItemCount(searchTerm);
+        totalPages = Math.ceil(totalItems / limit) || 1;
+      }
+    } else {
+      // 1. Fetch paginated items for the table
+      items = await itemModel.getPaginatedItems(searchTerm, limit, offset);
+      totalItems = await itemModel.getTotalItemCount(searchTerm);
+      totalPages = Math.ceil(totalItems / limit) || 1;
+    }
 
     // 2. Fetch ALL items & categories for calculating executive metrics and charts
     const allItems = await itemModel.getAllItems();
@@ -86,6 +109,9 @@ async function createItem(req, res) {
     if (Number(price) < 0) {
       return res.status(400).send("Price cannot be negative.");
     }
+    //semanctic search embedded
+    const textToEmbed = `${name} - ${description || ""}`;
+    const embedding = await generateEmbedding(textToEmbed);
 
     await itemModel.insertItem(
       name,
@@ -93,6 +119,7 @@ async function createItem(req, res) {
       category_id,
       price,
       stock_count || 0,
+      embedding,
     );
     res.redirect("/items");
   } catch (err) {
@@ -135,6 +162,9 @@ async function updateItem(req, res) {
       return res.status(400).send("Price cannot be negative.");
     }
 
+    const textToEmbed = `${name} - ${description || ""}`;
+    const embedding = await generateEmbedding(textToEmbed);
+
     await itemModel.updateItem(
       id,
       name,
@@ -142,6 +172,7 @@ async function updateItem(req, res) {
       category_id,
       price,
       stock_count || 0,
+      embedding,
     );
 
     res.redirect("/items");

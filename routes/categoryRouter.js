@@ -3,6 +3,18 @@ const { Router } = require("express");
 const categoryController = require("../controllers/categoryController");
 
 const router = Router();
+const { requireAdmin } = require("../middleware/authMiddleware");
+
+// Public read routes
+router.get("/", itemController.getAllItems);
+router.get("/:id", itemController.getItemById);
+
+// Protected admin write routes
+router.get("/new", requireAdmin, itemController.getCreateItemForm);
+router.post("/new", requireAdmin, itemController.createItem);
+router.get("/:id/edit", requireAdmin, itemController.getEditItemForm);
+router.post("/:id/edit", requireAdmin, itemController.updateItem);
+router.post("/:id/delete", requireAdmin, itemController.deleteItem);
 
 // GET /categories/ -> Render category management dashboard & form
 router.get("/", categoryController.renderCategoriesPage);

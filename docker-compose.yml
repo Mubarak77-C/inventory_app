@@ -7,6 +7,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://my_user:${DB_PASSWORD}@postgres:5432/inventory_db
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SESSION_SECRET=super_secret_inventory_session_key_change_in_prod
+      # - SESSION_SECRET=${SESSION_SECRET}    #when using at production level
     volumes:
       - .:/app
       - /app/node_modules
@@ -23,6 +25,7 @@ services:
       - POSTGRES_USER=my_user
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=inventory_db
+
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

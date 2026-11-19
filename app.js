@@ -8,6 +8,11 @@ const categoryRouter = require("./routes/categoryRouter");
 const methodOverride = require("method-override");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const session = require("express-session");
+const pgSession = require("connect-pg-simple")(session);
+const pool = require("./db/pool");
+const { attachUserToLocals } = require("./middleware/authMiddleware");
+const authRouter = require("./routes/authRouter");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -89,6 +94,27 @@ app.use("/items/chatbot", aiLimiter);
 app.use("/items/scan-image", aiLimiter);
 app.use("/items/generate-description", aiLimiter);
 app.use("/items/suggest-category", aiLimiter);
+
+app.use(
+  session({
+    store: new pgSession({
+      pool,
+      tableName: "session",
+    }),
+    secret: process.env.SESSION_SECRET || "dev_fallback_secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true, // Blocks JavaScript (XSS) from reading session cookie
+      sameSite: "lax", // Protects against CSRF attacks
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 1000 * 60 * 60 * 8, // 8-hour shift session
+    },
+  }),
+);
+
+app.use(attachUserToLocals);
+app.use("/", authRouter);
 
 app.use(methodOverride("_method"));
 

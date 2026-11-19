@@ -9,6 +9,23 @@ const {
 } = require("../services/geminiService");
 const categoryModel = require("../models/categoryModel");
 const router = Router();
+const { requireAdmin } = require("../middleware/authMiddleware");
+
+// Public read routes
+router.get("/", itemController.getAllItems);
+router.get("/:id", itemController.getItemById);
+const { requireAdmin } = require("../middleware/authMiddleware");
+
+// Public read routes
+router.get("/", itemController.getAllItems);
+router.get("/:id", itemController.getItemById);
+
+// Protected admin write routes
+router.get("/new", requireAdmin, itemController.getCreateItemForm);
+router.post("/new", requireAdmin, itemController.createItem);
+router.get("/:id/edit", requireAdmin, itemController.getEditItemForm);
+router.post("/:id/edit", requireAdmin, itemController.updateItem);
+router.post("/:id/delete", requireAdmin, itemController.deleteItem);
 
 // Add this import at the top of routes/itemRouter.js if not already present
 // (itemController already imports itemModel)

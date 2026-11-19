@@ -11,6 +11,64 @@ const rateLimit = require("express-rate-limit");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 1. Define the rate limiter FIRST
+const aiBurstLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    if (
+      req.xhr ||
+      req.headers.accept?.includes("application/json") ||
+      req.path !== "/items/chatbot"
+    ) {
+      return res.status(429).json({
+        error:
+          "Rate limit exceeded (max 5 AI requests per minute). Please wait 60 seconds.",
+      });
+    }
+    return res
+      .status(429)
+      .send("Too many AI requests (max 5/minute). Please wait 60 seconds.");
+  },
+});
+
+const aiSustainedLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    if (
+      req.xhr ||
+      req.headers.accept?.includes("application/json") ||
+      req.path !== "/items/chatbot"
+    ) {
+      return res.status(429).json({
+        error:
+          "15-minute AI quota reached (max 30 requests). Please try again later.",
+      });
+    }
+    return res
+      .status(429)
+      .send("15-minute AI quota reached. Please try again later.");
+  },
+});
+
+const aiProtection = [aiBurstLimiter, aiSustainedLimiter];
+
+// 2. Register the limiters BEFORE mounting itemRouter!
+app.post("/items/chatbot", aiProtection);
+app.post("/items/scan-image", aiProtection);
+app.post("/items/generate-description", aiProtection);
+app.post("/items/suggest-category", aiProtection);
+
+// // 3. Now mount your routers AFTER the limiters
+// app.use("/items", itemRouter);
+// app.use("/categories", categoryRouter);
+
 // 1. Secure HTTP headers (allow inline scripts & Tailwind CDN for EJS views)
 app.use(
   helmet({

@@ -34,7 +34,7 @@ done
 - **Requests #1–#5:** Returned `HTTP/1.1 200 OK` with `RateLimit-Remaining` decrementing (`29` -> `25`).
 - **Requests #6–#7:** Immediately blocked at Layer 1 with `HTTP/1.1 429 Too Many Requests`, `RateLimit-Limit: 5`, `RateLimit-Remaining: 0`, and JSON error payload `{"error":"Rate limit exceeded (max 5 AI requests per minute). Please wait 60 seconds."}` before reaching the Gemini API or Layer 2.
 
-######
+###### SESSION LOGIN ADMIN TESTING IN TERMINAL VERIFICATION PROOF ('CURL')
 
 ### login limit curl Terminal Verification Proof (`curl`)
 
@@ -55,6 +55,32 @@ curl -s -i -X POST http://localhost:3000/login \
 done
 
 # 3. Reset the in-memory limiter counter so your IP isn't locked out
+
+docker-compose restart app
+
+# 2.1 Step-by-Step Terminal Testing & Debugging (curl)
+
+# Test 1: Timing-Attack Defense (Valid Username vs. Fake Username)
+
+echo "Fake user time:"
+curl -s -o /dev/null -w "%{http_code} in %{time_total}s\n" \
+ -X POST http://localhost:3000/login \
+ -d "username=nonexistent_hacker&password=wrongpassword"
+
+echo "Real user (wrong password) time:"
+curl -s -o /dev/null -w "%{http_code} in %{time_total}s\n" \
+ -X POST http://localhost:3000/login \
+ -d "username=admin&password=wrongpassword"
+
+# 2.2 Test 2: Brute-Force Rate Limiter (loginLimiter -> HTTP 429)
+
+for i in {3..6}; do
+echo "Attempt #$i:"
+curl -s -i -X POST http://localhost:3000/login \
+ -d "username=admin&password=wrongpassword" | grep -E "HTTP/|RateLimit-|Too many"
+done
+
+# 2.3 Test 3: How to Reset the Limiter in Dev if You Lock Yourself Out
 
 docker-compose restart app
 

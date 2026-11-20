@@ -35,6 +35,7 @@
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
   
+    <% if (currentUser && currentUser.role === 'admin') { %>
   <!-- Left Column: Add Category Form -->
   <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-fit">
     <h2 class="text-lg font-semibold text-gray-900 mb-4">Add New Category</h2>
@@ -57,6 +58,7 @@
     </form>
   </div>
 
+  <% } %>
   <!-- Right Column: Existing Categories Table -->
 <!-- Right Column: Existing Categories Table -->
   <div class="lg:col-span-2">
@@ -90,6 +92,7 @@
                       View Items
                     </a>
                     
+                       <% if (currentUser && currentUser.role === 'admin') { %>
                     <!-- Delete Form with Icon Button -->
                     <form action="/categories/<%= category.id %>?_method=DELETE" method="POST" class="inline">
                       <button type="submit" class="inline-flex items-center p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition cursor-pointer" title="Delete Category" onclick="return confirm('WARNING: Deleting this category will also delete ALL items assigned to it. Are you sure?');">
@@ -98,7 +101,7 @@
                         </svg>
                       </button>
                     </form>
-
+  <% } %>
                   </div>
                 </td>
               </tr>

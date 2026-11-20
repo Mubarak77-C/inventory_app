@@ -2,46 +2,23 @@
 const { Router } = require("express");
 const itemController = require("../controllers/itemController");
 const multer = require("multer");
-// const { generateItemDescription } = require("../services/geminiService");
 const {
   generateItemDescription,
   suggestCategory,
 } = require("../services/geminiService");
 const categoryModel = require("../models/categoryModel");
+const { requireAdmin } = require("../middleware/authMiddleware");
+
 const router = Router();
-const { requireAdmin } = require("../middleware/authMiddleware");
+const upload = multer({ storage: multer.memoryStorage() });
 
-// Public read routes
-router.get("/", itemController.getAllItems);
-router.get("/:id", itemController.getItemById);
-const { requireAdmin } = require("../middleware/authMiddleware");
-
-// Public read routes
-router.get("/", itemController.getAllItems);
-router.get("/:id", itemController.getItemById);
-
-// Protected admin write routes
-router.get("/new", requireAdmin, itemController.getCreateItemForm);
-router.post("/new", requireAdmin, itemController.createItem);
-router.get("/:id/edit", requireAdmin, itemController.getEditItemForm);
-router.post("/:id/edit", requireAdmin, itemController.updateItem);
-router.post("/:id/delete", requireAdmin, itemController.deleteItem);
-
-// Add this import at the top of routes/itemRouter.js if not already present
-// (itemController already imports itemModel)
+// Public read & AI/report routes (must stay ABOVE any /:id routes)
+router.get("/", itemController.getItemsList);
 router.get("/chatbot", itemController.renderChatbotPage);
 router.post("/chatbot", itemController.handleChatQuery);
 router.post("/chatbot/clear", itemController.clearChat);
-// Add this route ABOVE your dynamic /:id routes
 router.get("/restock-advisor", itemController.getRestockAdvisorReport);
-
-router.get("/chatbot", itemController.renderChatbotPage);
-router.post("/chatbot", itemController.handleChatQuery);
-
 router.get("/export-pdf", itemController.exportInventoryPDF);
-
-// Configure multer to store uploaded image temporarily in memory buffer
-const upload = multer({ storage: multer.memoryStorage() });
 
 router.post(
   "/scan-image",
@@ -49,7 +26,6 @@ router.post(
   itemController.scanItemImage,
 );
 
-// Add this route inside routes/itemRouter.js (above dynamic /:id routes)
 router.post("/generate-description", async (req, res) => {
   try {
     const { name, categoryName } = req.body;
@@ -70,7 +46,6 @@ router.post("/generate-description", async (req, res) => {
 
     res.json({ description });
   } catch (err) {
-    // THIS LINE WILL PRINT THE FULL ERROR IN YOUR BROWSER ALERT & TERMINAL
     console.error("Detailed Error in AI generation route:", err);
     res
       .status(500)
@@ -85,7 +60,6 @@ router.post("/suggest-category", async (req, res) => {
       return res.status(400).json({ error: "Item name is required" });
     }
 
-    // Fetch existing categories from DB
     const categories = await categoryModel.getAllCategories();
     if (!categories || categories.length === 0) {
       return res.status(400).json({ error: "No categories available" });
@@ -99,20 +73,11 @@ router.post("/suggest-category", async (req, res) => {
   }
 });
 
-// GET /items/new -> Render the creation form
-router.get("/new", itemController.renderNewItemForm);
-
-// GET /items/:id/edit -> Render the edit form
-router.get("/:id/edit", itemController.renderEditItemForm);
-
-// GET /items/ -> Fetch all items & render dashboard
-router.get("/", itemController.getItemsList);
-
-// POST /items/ -> Handle form submission
-router.post("/", itemController.createItem);
-
-// PUT and DELETE routes (handled via method-override)
-router.put("/:id", itemController.updateItem);
-router.delete("/:id", itemController.deleteItem);
+// Protected Admin Write Routes
+router.get("/new", requireAdmin, itemController.renderNewItemForm);
+router.post("/", requireAdmin, itemController.createItem);
+router.get("/:id/edit", requireAdmin, itemController.renderEditItemForm);
+router.put("/:id", requireAdmin, itemController.updateItem);
+router.delete("/:id", requireAdmin, itemController.deleteItem);
 
 module.exports = router;

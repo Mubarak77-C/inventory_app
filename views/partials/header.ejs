@@ -26,9 +26,11 @@
         <a href="/items" class="hover:text-indigo-300 transition"
           >📦 Inventory Dashboard</a
         >
-        <a href="/items/new" class="hover:text-indigo-300 transition"
-          >+ Add Item</a
-        >
+          <% if (currentUser) { %>
+          <a href="/items/new" class="hover:text-indigo-300 transition"
+            >+ Add Item</a
+          >
+        <% } %>
         <a href="/categories" class="hover:text-indigo-300 transition"
           >📂 Categories</a
         >
@@ -40,6 +42,16 @@
         <a href="/items/chatbot" class="hover:text-indigo-300 transition"
           >💬 AI Chatbot</a
         >
+      </div>
+
+       <!-- TODO: Right-side Auth Section -->
+      <div class="flex items-center space-x-4 text-sm">
+        <% if (currentUser) { %>
+          <!-- 1. Show badge: "Admin: <%= currentUser.username %>" -->
+          <!-- 2. Add a POST form to "/logout" with a "Logout" submit button -->
+        <% } else { %>
+          <!-- 3. Show a link to "/login" styled as an "Admin Login" button -->
+        <% } %>
       </div>
     </nav>
     <main class="max-w-6xl mx-auto px-4 py-6"></main>

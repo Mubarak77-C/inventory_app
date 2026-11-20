@@ -3,26 +3,63 @@ const express = require("express");
 const path = require("path");
 require("dotenv").config();
 
-const itemRouter = require("./routes/itemRouter");
-const categoryRouter = require("./routes/categoryRouter");
 const methodOverride = require("method-override");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const session = require("express-session");
 const pgSession = require("connect-pg-simple")(session);
+
 const pool = require("./db/pool");
 const { attachUserToLocals } = require("./middleware/authMiddleware");
 const authRouter = require("./routes/authRouter");
+const itemRouter = require("./routes/itemRouter");
+const categoryRouter = require("./routes/categoryRouter");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 1. Define the rate limiter FIRST
+// 1. Security Headers & View Engine
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+  }),
+);
+app.set("views", path.join(__dirname, "views"));
+app.set("view engine", "ejs");
+
+// 2. Body Parsers & Method Override (MUST come before session & routes)
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(methodOverride("_method"));
+
+// 3. Session Store & User Locals (MUST come before all routers)
+app.use(
+  session({
+    store: new pgSession({
+      pool,
+      tableName: "session",
+    }),
+    secret: process.env.SESSION_SECRET || "dev_fallback_secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 1000 * 60 * 60 * 8, // 8-hour shift session
+    },
+  }),
+);
+app.use(attachUserToLocals);
+
+// 4. Two-Layer AI Rate Limiting (keyed by logged-in userId or IP)
 const aiBurstLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) =>
+    req.session?.userId ? `user_${req.session.userId}` : req.ip,
   handler: (req, res) => {
     if (
       req.xhr ||
@@ -45,6 +82,8 @@ const aiSustainedLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) =>
+    req.session?.userId ? `user_${req.session.userId}` : req.ip,
   handler: (req, res) => {
     if (
       req.xhr ||
@@ -63,86 +102,26 @@ const aiSustainedLimiter = rateLimit({
 });
 
 const aiProtection = [aiBurstLimiter, aiSustainedLimiter];
-
-// 2. Register the limiters BEFORE mounting itemRouter!
 app.post("/items/chatbot", aiProtection);
 app.post("/items/scan-image", aiProtection);
 app.post("/items/generate-description", aiProtection);
 app.post("/items/suggest-category", aiProtection);
 
-// // 3. Now mount your routers AFTER the limiters
-// app.use("/items", itemRouter);
-// app.use("/categories", categoryRouter);
-
-// 1. Secure HTTP headers (allow inline scripts & Tailwind CDN for EJS views)
-app.use(
-  helmet({
-    contentSecurityPolicy: false,
-  }),
-);
-
-// 2. Rate limiter specifically for expensive Gemini AI endpoints
-const aiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30, // Limit each IP to 30 AI requests per 15 minutes
-  message: "Too many AI requests from this IP. Please try again in 15 minutes.",
-  standardHeaders: true,
-  legacyHeaders: false,
+// 5. Application Routes
+app.get("/", (req, res) => {
+  res.redirect("/items");
 });
-
-app.use("/items/chatbot", aiLimiter);
-app.use("/items/scan-image", aiLimiter);
-app.use("/items/generate-description", aiLimiter);
-app.use("/items/suggest-category", aiLimiter);
-
-app.use(
-  session({
-    store: new pgSession({
-      pool,
-      tableName: "session",
-    }),
-    secret: process.env.SESSION_SECRET || "dev_fallback_secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true, // Blocks JavaScript (XSS) from reading session cookie
-      sameSite: "lax", // Protects against CSRF attacks
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 8, // 8-hour shift session
-    },
-  }),
-);
-
-app.use(attachUserToLocals);
 app.use("/", authRouter);
-
-app.use(methodOverride("_method"));
-
-app.set("views", path.join(__dirname, "views"));
-app.set("view engine", "ejs");
-
-// Middleware
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-
-// Mount Routers
-// Any request starting with /items will go to itemRouter
 app.use("/items", itemRouter);
 app.use("/categories", categoryRouter);
 
+// 6. 404 Catch-All Handler (MUST always stay at the very bottom)
 app.use((req, res) => {
   res.status(404).render("404", {
     title: "Page Not Found",
     heading: "Page Not Found",
     message: "We couldn't find the page you requested.",
   });
-});
-
-// Root route fallback
-app.get("/", (req, res) => {
-  res.send(
-    'Welcome to the Inventory API! Go to <a href="/items">/items</a> to see all items.',
-  );
 });
 
 // Start server listener

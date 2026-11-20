@@ -1,5 +1,19 @@
 const bcrypt = require("bcrypt");
 const pool = require("../db/pool");
+// Pre-computed dummy bcrypt hash so unknown usernames take the exact same time as wrong passwords
+const DUMMY_HASH =
+  "$2b$12$CwTycUXWue0Thq9StjUM0uJ8.jZ7tJ1wW6P7rX8q9y0z1A2B3C4D5";
+
+const user = result.rows;
+const hashToCheck = user ? user.password_hash : DUMMY_HASH;
+const isMatch = await bcrypt.compare(password || "", hashToCheck);
+
+if (!user || !isMatch) {
+  return res.status(401).render("login", {
+    title: "Admin Login",
+    error: "Invalid username or password.",
+  });
+}
 
 exports.getLoginForm = (req, res) => {
   if (req.session?.userId) return res.redirect("/");

@@ -26,7 +26,7 @@
         <a href="/items" class="hover:text-indigo-300 transition"
           >📦 Inventory Dashboard</a
         >
-          <% if (currentUser) { %>
+          <% if (currentUser && currentUser.role === 'admin') { %>
           <a href="/items/new" class="hover:text-indigo-300 transition"
             >+ Add Item</a
           >
@@ -46,11 +46,11 @@
 
       <!-- Right-side Auth Section -->
       <div class="flex items-center space-x-4 text-sm">
-        <% if (currentUser) { %>
+        <% if (currentUser && currentUser.role === 'admin') { %>
           <span
             class="bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 px-3 py-1 rounded-full text-xs font-medium"
           >
-            🛡️ Admin: <%= currentUser.username %>
+            🛡️ Admin: <%= currentUser.role.toUpperCase() %>: <%= currentUser.username %>
           </span>
           <form action="/logout" method="POST" class="inline">
             <button

@@ -1,11 +1,12 @@
 // app.js
 const express = require("express");
 const path = require("path");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 require("dotenv").config();
 
 const methodOverride = require("method-override");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
+// const rateLimit = require("express-rate-limit");
 const session = require("express-session");
 const pgSession = require("connect-pg-simple")(session);
 
@@ -59,7 +60,7 @@ const aiBurstLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) =>
-    req.session?.userId ? `user_${req.session.userId}` : req.ip,
+    req.session?.userId ? `user_${req.session.userId}` : ipKeyGenerator(req.ip),
   handler: (req, res) => {
     if (
       req.xhr ||
@@ -83,7 +84,7 @@ const aiSustainedLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) =>
-    req.session?.userId ? `user_${req.session.userId}` : req.ip,
+    req.session?.userId ? `user_${req.session.userId}` : ipKeyGenerator(req.ip),
   handler: (req, res) => {
     if (
       req.xhr ||

@@ -33,3 +33,29 @@ done
 
 - **Requests #1–#5:** Returned `HTTP/1.1 200 OK` with `RateLimit-Remaining` decrementing (`29` -> `25`).
 - **Requests #6–#7:** Immediately blocked at Layer 1 with `HTTP/1.1 429 Too Many Requests`, `RateLimit-Limit: 5`, `RateLimit-Remaining: 0`, and JSON error payload `{"error":"Rate limit exceeded (max 5 AI requests per minute). Please wait 60 seconds."}` before reaching the Gemini API or Layer 2.
+
+######
+
+### login limit curl Terminal Verification Proof (`curl`)
+
+# 1. Compare fake user vs. real user timing (both should be ~0.25s - 0.35s)
+
+curl -s -o /dev/null -w "Fake user: %{http_code} in %{time_total}s\n" \
+ -X POST http://localhost:3000/login -d "username=fake_bot&password=wrongpassword"
+
+curl -s -o /dev/null -w "Real user: %{http_code} in %{time_total}s\n" \
+ -X POST http://localhost:3000/login -d "username=admin&password=wrongpassword"
+
+# 2. Trigger brute-force lockout on attempt #6 (HTTP 429)
+
+for i in {3..6}; do
+echo "Attempt #$i:"
+curl -s -i -X POST http://localhost:3000/login \
+ -d "username=admin&password=wrongpassword" | grep -E "HTTP/|RateLimit-|Too many"
+done
+
+# 3. Reset the in-memory limiter counter so your IP isn't locked out
+
+docker-compose restart app
+
+######

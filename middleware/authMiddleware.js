@@ -1,16 +1,25 @@
+function wantsJson(req) {
+  return Boolean(req.xhr || req.headers.accept?.includes("application/json"));
+}
+
 function requireRole(...allowedRoles) {
   return (req, res, next) => {
-    // 1. Not logged in -> 401 / redirect to /login
+    // 1. Not logged in -> 401 JSON or redirect to /login
     if (!req.session || !req.session.userId) {
-      if (req.headers.accept?.includes("application/json") || req.xhr) {
+      if (wantsJson(req)) {
         return res.status(401).json({ error: "Authentication required." });
       }
       return res.redirect("/login");
     }
 
-    // 2. Logged in, but role is not allowed -> 403 Forbidden
+    // 2. Superadmin gets full bypass across role-protected routes
+    if (req.session.role === "superadmin") {
+      return next();
+    }
+
+    // 3. Logged in, but role is not in allowedRoles -> 403 Forbidden
     if (!allowedRoles.includes(req.session.role)) {
-      if (req.headers.accept?.includes("application/json") || req.xhr) {
+      if (wantsJson(req)) {
         return res.status(403).json({
           error: `Access denied. Requires role: ${allowedRoles.join(" or ")}.`,
         });
@@ -26,7 +35,7 @@ function requireRole(...allowedRoles) {
   };
 }
 
-// Keep requireAdmin as a convenient shortcut so existing routes don't break!
+// Keep requireAdmin as a shortcut for admin-only routes (superadmin also passes via requireRole)
 const requireAdmin = requireRole("admin");
 
 function attachUserToLocals(req, res, next) {

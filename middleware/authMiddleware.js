@@ -19,18 +19,12 @@ function requireRole(...allowedRoles) {
 
     // 3. Logged in, but role is not in allowedRoles -> 403 Forbidden
     if (!allowedRoles.includes(req.session.role)) {
+      const message = `Access denied. Requires role: ${allowedRoles.join(" or ")}.`;
       if (wantsJson(req)) {
-        return res.status(403).json({
-          error: `Access denied. Requires role: ${allowedRoles.join(" or ")}.`,
-        });
+        return res.status(403).json({ error: message });
       }
-      return res
-        .status(403)
-        .send(
-          "403 Forbidden: Your role does not have permission for this action.",
-        );
+      return res.status(403).render("403", { message });
     }
-
     return next();
   };
 }

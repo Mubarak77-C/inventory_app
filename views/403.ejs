@@ -1,0 +1,19 @@
+<%- include('partials/header', { title: '403 Forbidden' }) %>
+
+<div class="max-w-lg mx-auto text-center py-16 px-4">
+  <p class="text-5xl font-extrabold text-rose-600">403</p>
+  <h1 class="mt-3 text-2xl font-bold text-slate-900">Access Denied</h1>
+  <p class="mt-2 text-sm text-slate-600">
+    <%= message || "You don't have permission to access this page or perform this action." %>
+  </p>
+  <div class="mt-6 flex justify-center gap-3">
+    <a href="/items" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+      Back to Dashboard
+    </a>
+    <a href="/categories" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
+      View Categories
+    </a>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

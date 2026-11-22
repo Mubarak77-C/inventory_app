@@ -5,6 +5,11 @@ const pool = require("./pool");
 async function seedUsers() {
   const usersToSeed = [
     {
+      username: process.env.SUPERADMIN_USERNAME || "superadmin",
+      password: process.env.SUPERADMIN_PASSWORD || "SuperAdmin@1234",
+      role: "superadmin",
+    },
+    {
       username: process.env.ADMIN_USERNAME || "admin",
       password: process.env.ADMIN_PASSWORD || "Admin@1234",
       role: "admin",

@@ -18,6 +18,7 @@
     </style>
   </head>
   <body class="bg-gray-50 text-gray-900 min-h-screen">
+    <% const canManage = Boolean(currentUser && ["admin", "superadmin"].includes(currentUser.role)); %>
     <!-- Navigation Bar -->
     <nav
       class="bg-slate-800 text-white px-6 py-4 shadow-md flex items-center justify-between"
@@ -26,7 +27,7 @@
         <a href="/items" class="hover:text-indigo-300 transition"
           >📦 Inventory Dashboard</a
         >
-          <% if (currentUser && currentUser.role === 'admin') { %>
+          <% if (canManage) { %>
           <a href="/items/new" class="hover:text-indigo-300 transition"
             >+ Add Item</a
           >

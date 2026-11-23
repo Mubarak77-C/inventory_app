@@ -1,6 +1,10 @@
 // controllers/orderController.js
 
-const { createOrder, listOrders } = require("../models/orderModel");
+const {
+  createOrder,
+  listOrders,
+  transitionOrderStatus,
+} = require("../models/orderModel");
 
 function extractIdempotencyKey(req) {
   return (

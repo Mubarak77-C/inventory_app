@@ -247,7 +247,12 @@
 
         currentIdempotencyKey = createKey();
         feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} created (${data.order.status}) — Total: $${Number(data.order.total_amount).toFixed(2)}</div>`;
-        setTimeout(() => window.location.reload(), 400);
+        // Reset form rows & subtotal before reloading fresh stock counts
+form.reset();
+recalcSubtotal();
+setTimeout(() => {
+  window.location.href = "/orders?_=" + Date.now();
+}, 350);
       } catch (err) {
         feedback.innerHTML = `<div class="msg-err">Network error while punching order.</div>`;
       }

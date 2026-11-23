@@ -191,6 +191,14 @@ async function createOrder({
     );
     const createdOrder = orderInsertRes.rows[0];
 
+    // Log initial order creation in audit history
+    await client.query(
+      `INSERT INTO public.order_status_history
+         (order_id, from_status, to_status, changed_by, reason)
+       VALUES ($1, NULL, $2, $3, $4)`,
+      [createdOrder.id, status, createdBy, "Order punched"],
+    );
+
     // 4. Insert order_items snapshot rows
     const insertedItems = [];
     for (const snap of lineSnapshots) {
@@ -316,7 +324,12 @@ async function getOrderWithItemsById(clientOrPool, orderId) {
  * Transitions an order's status inside a transaction.
  * If transitioning to CANCELLED, atomically restores items.stock_count for all line items.
  */
-async function transitionOrderStatus({ orderId, nextStatus }) {
+async function transitionOrderStatus({
+  orderId,
+  nextStatus,
+  changedBy = null,
+  reason = null,
+}) {
   const numericOrderId = Number(orderId);
   if (!Number.isInteger(numericOrderId) || numericOrderId <= 0) {
     throw createDomainError(
@@ -336,6 +349,16 @@ async function transitionOrderStatus({ orderId, nextStatus }) {
       400,
     );
   }
+
+  const actorId =
+    Number.isInteger(Number(changedBy)) && Number(changedBy) > 0
+      ? Number(changedBy)
+      : null;
+
+  const cleanReason =
+    typeof reason === "string" && reason.trim().length > 0
+      ? reason.trim().slice(0, 250)
+      : null;
 
   const client = await pool.connect();
 
@@ -409,6 +432,13 @@ async function transitionOrderStatus({ orderId, nextStatus }) {
        SET status = $1
        WHERE id = $2`,
       [normalizedStatus, numericOrderId],
+    );
+
+    await client.query(
+      `INSERT INTO public.order_status_history
+         (order_id, from_status, to_status, changed_by, reason)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [numericOrderId, currentStatus, normalizedStatus, actorId, cleanReason],
     );
 
     const updated = await getOrderWithItemsById(client, numericOrderId);

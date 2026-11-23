@@ -1,0 +1,174 @@
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ node --check models/orderModel.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db -c "SELECT id, name, price, stock_count FROM items ORDER BY id ASC;"
+ id |            name             | price  | stock_count 
+----+-----------------------------+--------+-------------
+  1 | Chef Knife                  |  45.99 |          12
+  2 | Blender                     | 120.50 |           4
+  3 | Cocktail Shaker             |  15.00 |          25
+  4 | Pepsi cold drink            |   2.12 |           1
+  5 | Cold Brew Coffee Keg        |  45.00 |          10
+  6 | Flavored Iced Tea:          |   2.00 |          25
+  7 | Mint Cooler                 |   5.00 |           5
+  8 | Signature & Craft Cocktails |  70.00 |          30
+  9 | Brownies                    |   2.00 |           0
+ 10 | cheesecakes                 |   5.00 |          10
+ 11 | Vanilla ice-cream           |   4.00 |          20
+ 12 | Cold Brew Coffee Keg        |  45.00 |          22
+(12 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node -e '
+const pool = require("./db/pool");
+const { createOrder } = require("./models/orderModel");
+
+(async () => {
+  try {
+    // 1. Check current stock of item #1 (adjust ID if needed)
+    const before = await pool.query("SELECT id, name, price, stock_count FROM items ORDER BY id ASC LIMIT 1");
+    console.log("Before:", before.rows[0]);
+    if (!before.rows[0]) throw new Error("No items in DB");
+    const itemId = before.rows[0].id;
+
+    // 2. Test invalid quantity (0)
+    try {
+      await createOrder({ idempotencyKey: "test-zero-1", items: [{ itemId, quantity: 0 }] });
+      console.error("FAIL: quantity 0 should have thrown");
+    } catch (e) {
+      console.log("PASS qty=0 rejected:", e.code, e.message);
+    }
+
+    // 3. Test valid order + idempotent replay
+    const key = "test-order-" + Date.now();
+    const first = await createOrder({ idempotencyKey: key, items: [{ itemId, quantity: 1 }] });
+')();wait pool.end();expected error:", err);d, name, price, stock_count FROM items WHERE id = $1", [itemId]);;potentReplay);
+◇ injected env (2) from .env
+Before: { id: 1, name: 'Chef Knife', price: '45.99', stock_count: 12 }
+PASS qty=0 rejected: INVALID_QUANTITY Invalid quantity for item #1: 0. Quantity must be greater than 0.
+PASS first order: 1 total: 45.99 replay: false
+PASS replay order: 1 replay: true
+PASS oversell rolled back: INSUFFICIENT_STOCK Insufficient stock for "Chef Knife" (item #1). Requested 999999, available 11.
+After: { id: 1, name: 'Chef Knife', price: '45.99', stock_count: 11 }
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node -e '
+const pool = require("./db/pool");
+const { createOrder } = require("./models/orderModel");
+
+(async () => {
+  const itemId = 9;
+
+  try {
+    const before = await pool.query("SELECT id, name, price, stock_count FROM items WHERE id = $1", [itemId]);
+    console.log("Before:", before.rows[0]);
+
+    // 1. Attempt to order out-of-stock item #9 (stock_count = 0)
+    try {
+      await createOrder({
+        idempotencyKey: "test-zero-stock-9-" + Date.now(),
+        items: [{ itemId, quantity: 1 }]
+      });
+      console.error("FAIL: out-of-stock item #9 should have thrown INSUFFICIENT_STOCK");
+    } catch (e) {
+      console.log("PASS out-of-stock rejected:", e.code, "|", e.message, "| meta:", {
+        itemId: e.itemId,
+        requested: e.requested,
+        available: e.available
+      });
+')();wait pool.end();expected error:", err);der.id, "replay:", replay.idempotentReplay);: 1 }] }); [itemId]);
+◇ injected env (2) from .env
+Before: { id: 9, name: 'Brownies', price: '2.00', stock_count: 0 }
+PASS out-of-stock rejected: INSUFFICIENT_STOCK | Insufficient stock for "Brownies" (item #9). Requested 1, available 0. | meta: { itemId: 9, requested: 1, available: 0 }
+After: { id: 9, name: 'Brownies', price: '2.00', stock_count: 0 }
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ createOrder({ idempotencyKey: "test-partial-stock-" + Date.now(), items: [{ itemId, quantity: 4 }] })
+bash: syntax error near unexpected token `{'
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node -e '
+const pool = require("./db/pool");
+const { createOrder } = require("./models/orderModel");
+
+(async () => {
+  const itemId = 4;
+
+  try {
+    const before = await pool.query("SELECT id, name, price, stock_count FROM items WHERE id = $1", [itemId]);
+    console.log("Before:", before.rows[0]);
+
+    // Attempt to punch qty=3 when stock_count=1
+')();wait pool.end();expected error:", err);d, name, price, stock_count FROM items WHERE id = $1", [itemId]);
+◇ injected env (2) from .env
+Before: { id: 4, name: 'Pepsi cold drink', price: '2.12', stock_count: 1 }
+PASS rejected: INSUFFICIENT_STOCK | Insufficient stock for "Pepsi cold drink" (item #4). Requested 3, available 1. | meta: { itemId: 4, requested: 3, available: 1 }
+After: { id: 4, name: 'Pepsi cold drink', price: '2.12', stock_count: 1 }
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ node --check controllers/orderController.js routes/orderRouter.js app.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ node --check controllers/orderController.js routes/orderRouter.js app.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ node --check controllers/orderController.js routes/orderRouter.js app.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ node --check controllers/orderController.js routes/orderRouter.js app.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ node --check controllers/orderController.js routes/orderRouter.js app.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ node --check controllers/orderController.js routes/orderRouter.js app.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ # 1. Unauthenticated JSON check -> 401
+curl -s -i -X POST http://localhost:3000/orders \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"idempotencyKey":"curl-unauth-1","items":[{"itemId":1,"quantity":1}]}'
+
+# 2. Login as cashier1 (or admin) saving cookies to /tmp/cookies.txt
+curl -s -c /tmp/cookies.txt -L -X POST http://localhost:3000/login \
+  -d "username=cashier1&password=Cashier@1234" > /dev/null
+
+# 3. Punch an order -> 201 Created
+curl -s -i -b /tmp/cookies.txt -X POST http://localhost:3000/orders \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"idempotencyKey":"curl-order-1","items":[{"itemId":1,"quantity":1}]}'
+HTTP/1.1 401 Unauthorized
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 36
+ETag: W/"24-2ya6UNOy8AlxJkjNOyYmjYabP90"
+Date: Mon, 23 Nov 2026 10:57:51 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Authentication required."}HTTP/1.1 201 Created
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 297
+ETag: W/"129-5B4BXQs1ItMSr6WUw+5UiGi2144"
+Date: Mon, 23 Nov 2026 10:57:52 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"idempotentReplay":false,"order":{"id":2,"idempotency_key":"curl-order-1","status":"PENDING","total_amount":"45.99","created_by":3,"created_at":"2026-11-23T10:57:52.323Z"},"items":[{"id":2,"order_id":2,"item_id":1,"item_name":"Chef Knife","unit_price":"
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT * FROM orders WHERE id = 2;" \
+  -c "SELECT * FROM order_items WHERE order_id = 2;"
+ id | idempotency_key | status  | total_amount | created_by |          created_at          
+----+-----------------+---------+--------------+------------+------------------------------
+  2 | curl-order-1    | PENDING |        45.99 |          3 | 2026-11-23 10:57:52.32332+00
+(1 row)
+
+ id | order_id | item_id | item_name  | unit_price | quantity | line_total 
+----+----------+---------+------------+------------+----------+------------
+  2 |        2 |       1 | Chef Knife |      45.99 |        1 |      45.99
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -b /tmp/cookies.txt http://localhost:3000/orders \
+  -H "Accept: application/json"
+{"orders":[{"id":2,"idempotency_key":"curl-order-1","status":"PENDING","total_amount":"45.99","created_by":3,"created_at":"2026-11-23T10:57:52.323Z","items":[{"id":2,"item_id":1,"item_name":"Chef Knife","unit_price":45.99,"quantity":1,"line_total":45.99}]},{"id":1,"idempotency_key":"test-order-1795428485801","status":"PENDING","total_amount":"45.99","created_by":null,"created_at":"2026-11-23T10:08:05.802Z","items":[{"id":1,"item_id":1,"item_name":"Chef Knife","unit_price":45.99,"quantity":1,"line_total"
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 

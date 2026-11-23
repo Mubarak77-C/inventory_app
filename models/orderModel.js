@@ -245,7 +245,46 @@ async function createOrder({
   }
 }
 
+async function listOrders(limit = 50) {
+  const safeLimit =
+    Number.isInteger(Number(limit)) && Number(limit) > 0
+      ? Math.min(Number(limit), 200)
+      : 50;
+
+  const { rows } = await pool.query(
+    `SELECT
+       o.id,
+       o.idempotency_key,
+       o.status,
+       o.total_amount,
+       o.created_by,
+       o.created_at,
+       COALESCE(
+         json_agg(
+           json_build_object(
+             'id', oi.id,
+             'item_id', oi.item_id,
+             'item_name', oi.item_name,
+             'unit_price', oi.unit_price,
+             'quantity', oi.quantity,
+             'line_total', oi.line_total
+           ) ORDER BY oi.id ASC
+         ) FILTER (WHERE oi.id IS NOT NULL),
+         '[]'::json
+       ) AS items
+     FROM public.orders o
+     LEFT JOIN public.order_items oi ON oi.order_id = o.id
+     GROUP BY o.id
+     ORDER BY o.created_at DESC, o.id DESC
+     LIMIT $1`,
+    [safeLimit],
+  );
+
+  return rows;
+}
+
 module.exports = {
   createOrder,
   getOrderWithItemsByIdempotencyKey,
+  listOrders,
 };

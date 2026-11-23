@@ -50,6 +50,24 @@ async function punchOrder(req, res, next) {
   }
 }
 
+async function getOrders(req, res, next) {
+  try {
+    const orders = await listOrders(req.query.limit);
+    const wantsJson =
+      req.xhr ||
+      (req.headers.accept && req.headers.accept.includes("application/json"));
+
+    if (wantsJson) {
+      return res.status(200).json({ orders });
+    }
+
+    return res.render("orders/index", { orders });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   punchOrder,
+  getOrders,
 };

@@ -172,3 +172,97 @@ ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ c
   -H "Accept: application/json"
 {"orders":[{"id":2,"idempotency_key":"curl-order-1","status":"PENDING","total_amount":"45.99","created_by":3,"created_at":"2026-11-23T10:57:52.323Z","items":[{"id":2,"item_id":1,"item_name":"Chef Knife","unit_price":45.99,"quantity":1,"line_total":45.99}]},{"id":1,"idempotency_key":"test-order-1795428485801","status":"PENDING","total_amount":"45.99","created_by":null,"created_at":"2026-11-23T10:08:05.802Z","items":[{"id":1,"item_id":1,"item_name":"Chef Knife","unit_price":45.99,"quantity":1,"line_total"
 ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 
+
+ node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ # Check item #1 stock before cancelling an order 
+docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, name, stock_count FROM items WHERE id = 1;"
+
+# Move order #2 from PENDING -> PREPARING
+curl -s -i -b /tmp/cookies.txt -X PATCH http://localhost:3000/orders/2/status \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"status":"PREPARING"}'
+
+# Cancel order #2 -> should restock item #1 by +1
+curl -s -i -b /tmp/cookies.txt -X PATCH http://localhost:3000/orders/2/status \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"status":"CANCELLED"}'
+
+# Try cancelling order #2 a second time -> should return 409 INVALID_STATUS_TRANSITION
+curl -s -i -b /tmp/cookies.txt -X PATCH http://localhost:3000/orders/2/status \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"status":"CANCELLED"}'
+ id |    name    | stock_count 
+----+------------+-------------
+  1 | Chef Knife |          10
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose ps
+docker-compose logs --tail=60 app
+NAME                 IMAGE                    COMMAND                  SERVICE    CREATED      STATUS                 PORTS
+inventory_node_app   inventory-app-app        "docker-entrypoint.s…"   app        4 days ago   Up 3 hours             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp
+inventory_postgres   pgvector/pgvector:pg15   "docker-entrypoint.s…"   postgres   5 days ago   Up 3 hours (healthy)   5432/tcp
+inventory_node_app  |   ^
+inventory_node_app  | 
+inventory_node_app  | ReferenceError: transitionOrderStatus is not defined
+inventory_node_app  |     at Object.<anonymous> (/app/controllers/orderController.js:109:3)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  |     at Module.load (node:internal/modules/cjs/loader:1203:32)
+inventory_node_app  |     at Module._load (node:internal/modules/cjs/loader:1019:12)
+inventory_node_app  |     at Module.require (node:internal/modules/cjs/loader:1231:19)
+inventory_node_app  |     at require (node:internal/modules/helpers:177:18)
+inventory_node_app  |     at Object.<anonymous> (/app/routes/orderRouter.js:3:25)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  | 
+inventory_node_app  | Node.js v18.20.8
+inventory_node_app  | [nodemon] app crashed - waiting for file changes before starting...
+inventory_node_app  | [nodemon] restarting due to changes...
+inventory_node_app  | [nodemon] starting `node app.js`
+inventory_node_app  | ◇ injected env (2) from .env
+inventory_node_app  | ◇ injected env (0) from .env
+inventory_node_app  | /app/routes/orderRouter.js:14
+inventory_node_app  |   requireRole("admin", "cashier")
+inventory_node_app  |                                 ^
+inventory_node_app  | 
+inventory_node_app  | SyntaxError: missing ) after argument list
+inventory_node_app  |     at internalCompileFunction (node:internal/vm:76:18)
+inventory_node_app  |     at wrapSafe (node:internal/modules/cjs/loader:1283:20)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1328:27)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  |     at Module.load (node:internal/modules/cjs/loader:1203:32)
+inventory_node_app  |     at Module._load (node:internal/modules/cjs/loader:1019:12)
+inventory_node_app  |     at Module.require (node:internal/modules/cjs/loader:1231:19)
+inventory_node_app  |     at require (node:internal/modules/helpers:177:18)
+inventory_node_app  |     at Object.<anonymous> (/app/app.js:18:21)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  | 
+inventory_node_app  | Node.js v18.20.8
+inventory_node_app  | [nodemon] app crashed - waiting for file changes before starting...
+inventory_node_app  | [nodemon] restarting due to changes...
+inventory_node_app  | [nodemon] starting `node app.js`
+inventory_node_app  | ◇ injected env (2) from .env
+inventory_node_app  | ◇ injected env (0) from .env
+inventory_node_app  | /app/controllers/orderController.js:109
+inventory_node_app  |   transitionOrderStatus,
+inventory_node_app  |   ^
+inventory_node_app  | 
+inventory_node_app  | ReferenceError: transitionOrderStatus is not defined
+inventory_node_app  |     at Object.<anonymous> (/app/controllers/orderController.js:109:3)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  |     at Module.load (node:internal/modules/cjs/loader:1203:32)
+inventory_node_app  |     at Module._load (node:internal/modules/cjs/loader:1019:12)
+inventory_node_app  |     at Module.require (node:internal/modules/cjs/loader:1231:19)
+inventory_node_app  |     at require (node:internal/modules/helpers:177:18)
+inventory_node_app  |     at Object.<anonymous> (/app/routes/orderRouter.js:3:25)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  | 
+inventory_node_app  | Node.js v18.20.8
+inventory_node_app  | [nodemon] app crashed - waiting for file changes before starting...
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 

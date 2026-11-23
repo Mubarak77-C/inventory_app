@@ -115,7 +115,11 @@
                 <% }) %>
               </td>
               <td><%= order.created_by ?? "-" %></td>
-              <td><%= new Date(order.created_at).toLocaleString() %></td>
+              <td>
+              <time class="order-time" datetime="<%= new Date(order.created_at).toISOString() %>">
+              <%= new Date(order.created_at).toISOString() %>
+              </time>
+              </td>
               <td class="actions-cell">
                 <% if (nextStatus) { %>
                   <button
@@ -299,6 +303,17 @@ setTimeout(() => {
         }
       });
     });
+
+    document.querySelectorAll(".order-time").forEach((el) => {
+  const iso = el.getAttribute("datetime");
+  if (!iso) return;
+  const dt = new Date(iso);
+  el.textContent = new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(dt);
+  el.title = `UTC: ${iso}`;
+});
 
     recalcSubtotal();
   </script>

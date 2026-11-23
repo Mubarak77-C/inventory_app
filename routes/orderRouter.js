@@ -9,4 +9,9 @@ const router = Router();
 router.get("/", requireRole("admin", "cashier"), orderController.getOrders);
 router.post("/", requireRole("admin", "cashier"), orderController.punchOrder);
 
+router.patch(
+  "/:id/status",
+  requireRole("admin", "cashier"),
+  orderController.updateOrderStatus,
+);
 module.exports = router;

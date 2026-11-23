@@ -284,8 +284,157 @@ async function listOrders(limit = 50) {
   return rows;
 }
 
+const ALLOWED_TRANSITIONS = {
+  PENDING: new Set(["PREPARING", "CANCELLED"]),
+  PREPARING: new Set(["READY", "CANCELLED"]),
+  READY: new Set(["SERVED", "COMPLETED", "CANCELLED"]),
+  SERVED: new Set(["COMPLETED"]),
+  COMPLETED: new Set([]),
+  CANCELLED: new Set([]),
+};
+
+async function getOrderWithItemsById(clientOrPool, orderId) {
+  const orderRes = await clientOrPool.query(
+    `SELECT * FROM public.orders WHERE id = $1`,
+    [orderId],
+  );
+  const order = orderRes.rows[0];
+  if (!order) return null;
+
+  const itemsRes = await clientOrPool.query(
+    `SELECT * FROM public.order_items WHERE order_id = $1 ORDER BY id ASC`,
+    [order.id],
+  );
+
+  return {
+    order,
+    items: itemsRes.rows,
+  };
+}
+
+/**
+ * Transitions an order's status inside a transaction.
+ * If transitioning to CANCELLED, atomically restores items.stock_count for all line items.
+ */
+async function transitionOrderStatus({ orderId, nextStatus }) {
+  const numericOrderId = Number(orderId);
+  if (!Number.isInteger(numericOrderId) || numericOrderId <= 0) {
+    throw createDomainError(
+      `Invalid orderId: ${orderId}. Must be a positive integer.`,
+      "INVALID_ORDER_ID",
+      400,
+    );
+  }
+
+  const normalizedStatus =
+    typeof nextStatus === "string" ? nextStatus.trim().toUpperCase() : "";
+
+  if (!VALID_STATUSES.has(normalizedStatus)) {
+    throw createDomainError(
+      `Invalid target status: "${nextStatus}".`,
+      "INVALID_ORDER_STATUS",
+      400,
+    );
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Lock the order row to serialize concurrent status/cancellation requests
+    const lockRes = await client.query(
+      `SELECT * FROM public.orders WHERE id = $1 FOR UPDATE`,
+      [numericOrderId],
+    );
+
+    if (lockRes.rowCount === 0) {
+      throw createDomainError(
+        `Order #${numericOrderId} not found.`,
+        "ORDER_NOT_FOUND",
+        404,
+        { orderId: numericOrderId },
+      );
+    }
+
+    const currentOrder = lockRes.rows[0];
+    const currentStatus = currentOrder.status;
+    const allowedNext = ALLOWED_TRANSITIONS[currentStatus] || new Set();
+
+    if (!allowedNext.has(normalizedStatus)) {
+      throw createDomainError(
+        `Cannot transition order #${numericOrderId} from ${currentStatus} to ${normalizedStatus}.`,
+        "INVALID_STATUS_TRANSITION",
+        409,
+        {
+          orderId: numericOrderId,
+          currentStatus,
+          attemptedStatus: normalizedStatus,
+        },
+      );
+    }
+
+    let restoredItems = [];
+
+    if (normalizedStatus === "CANCELLED") {
+      const lineItemsRes = await client.query(
+        `SELECT item_id, quantity
+         FROM public.order_items
+         WHERE order_id = $1
+         ORDER BY item_id ASC`,
+        [numericOrderId],
+      );
+
+      for (const line of lineItemsRes.rows) {
+        const restockRes = await client.query(
+          `UPDATE public.items
+           SET stock_count = stock_count + $1
+           WHERE id = $2
+           RETURNING id, stock_count`,
+          [line.quantity, line.item_id],
+        );
+
+        if (restockRes.rowCount > 0) {
+          restoredItems.push({
+            itemId: restockRes.rows[0].id,
+            restockedQuantity: line.quantity,
+            newStockCount: restockRes.rows[0].stock_count,
+          });
+        }
+      }
+    }
+
+    await client.query(
+      `UPDATE public.orders
+       SET status = $1
+       WHERE id = $2`,
+      [normalizedStatus, numericOrderId],
+    );
+
+    const updated = await getOrderWithItemsById(client, numericOrderId);
+
+    await client.query("COMMIT");
+
+    return {
+      order: updated.order,
+      items: updated.items,
+      restoredItems,
+    };
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackErr) {
+      console.error("Failed to rollback order status transition:", rollbackErr);
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   createOrder,
   getOrderWithItemsByIdempotencyKey,
   listOrders,
+  transitionOrderStatus,
 };

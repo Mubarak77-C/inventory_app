@@ -67,7 +67,45 @@ async function getOrders(req, res, next) {
     return next(err);
   }
 }
+
+async function updateOrderStatus(req, res, next) {
+  try {
+    const { id } = req.params;
+    const nextStatus = req.body?.status;
+
+    const result = await transitionOrderStatus({
+      orderId: id,
+      nextStatus,
+    });
+
+    return res.status(200).json({
+      order: result.order,
+      items: result.items,
+      restoredItems: result.restoredItems,
+    });
+  } catch (err) {
+    if (err.statusCode) {
+      const payload = {
+        error: err.message,
+        code: err.code || "ORDER_STATUS_ERROR",
+      };
+
+      if (err.orderId !== undefined) payload.orderId = err.orderId;
+      if (err.currentStatus !== undefined)
+        payload.currentStatus = err.currentStatus;
+      if (err.attemptedStatus !== undefined) {
+        payload.attemptedStatus = err.attemptedStatus;
+      }
+
+      return res.status(err.statusCode).json(payload);
+    }
+
+    return next(err);
+  }
+}
 module.exports = {
   punchOrder,
   getOrders,
+  transitionOrderStatus,
+  updateOrderStatus,
 };

@@ -265,4 +265,89 @@ inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/l
 inventory_node_app  | 
 inventory_node_app  | Node.js v18.20.8
 inventory_node_app  | [nodemon] app crashed - waiting for file changes before starting...
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ # 0. Ensure /tmp/cookies.txt has an active cashier1/admin session (re-run if needed)
+curl -s -c /tmp/cookies.txt -L -X POST http://localhost:3000/login \
+  -d "username=cashier1&password=Cashier@1234" > /dev/null
+
+# 1. Check Item #1 stock BEFORE cancelling Order #2
+docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, name, stock_count FROM items WHERE id = 1;"
+
+# 2. Transition Order #2 from PENDING -> PREPARING (expect HTTP 200)
+curl -s -i -b /tmp/cookies.txt -X PATCH http://localhost:3000/orders/2/status \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"status":"PREPARING"}'
+
+# 3. Transition Order #2 from PREPARING -> CANCELLED (expect HTTP 200 + restoredItems)
+curl -s -i -b /tmp/cookies.txt -X PATCH http://localhost:3000/orders/2/status \
+  -d '{"status":"CANCELLED"}'n" \son" \ http://localhost:3000/orders/2/status \_TRANSITION)
+ id |    name    | stock_count 
+----+------------+-------------
+  1 | Chef Knife |          10
+(1 row)
+
+HTTP/1.1 200 OK
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 293
+ETag: W/"125-6NiRhaDhC6kq34MUPQB0ZxXLUfI"
+Date: Mon, 23 Nov 2026 15:25:36 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"order":{"id":2,"idempotency_key":"curl-order-1","status":"PREPARING","total_amount":"45.99","created_by":3,"created_at":"2026-11-23T10:57:52.323Z"},"items":[{"id":2,"order_id":2,"item_id":1,"item_name":"Chef Knife","unit_price":"45.99","quantity":1,"line_total":"45.99"}],"restoredItems":[]}HTTP/1.1 200 OK
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 346
+ETag: W/"15a-5ekmiK0kdYT3/+F4fx9lNh7z0hA"
+Date: Mon, 23 Nov 2026 15:25:36 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"order":{"id":2,"idempotency_key":"curl-order-1","status":"CANCELLED","total_amount":"45.99","created_by":3,"created_at":"2026-11-23T10:57:52.323Z"},"items":[{"id":2,"order_id":2,"item_id":1,"item_name":"Chef Knife","unit_price":"45.99","quantity":1,"line_total":"45.99"}],"restoredItems":[{"itemId":1,"restockedQuantity":1,"newStockCount":11}]} id |    name    | stock_count 
+----+------------+-------------
+  1 | Chef Knife |          11
+(1 row)
+
+HTTP/1.1 409 Conflict
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 172
+ETag: W/"ac-xF097yTKL2op7asowwjt/twC1Xk"
+Date: Mon, 23 Nov 2026 15:25:36 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Cannot transition order #2 from CANCELLED to CANCELLED.","code":"INVALID_STATUS_TRANSITION","orderId":2,"currentStatu
 ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 

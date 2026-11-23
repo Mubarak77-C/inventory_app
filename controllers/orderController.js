@@ -87,10 +87,15 @@ async function updateOrderStatus(req, res, next) {
   try {
     const { id } = req.params;
     const nextStatus = req.body?.status;
+    const reason = req.body?.reason;
+    const changedBy =
+      req.session?.userId ?? req.session?.user?.id ?? req.user?.id ?? null;
 
     const result = await transitionOrderStatus({
       orderId: id,
       nextStatus,
+      changedBy,
+      reason,
     });
 
     return res.status(200).json({

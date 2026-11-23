@@ -5,6 +5,7 @@ const {
   listOrders,
   transitionOrderStatus,
 } = require("../models/orderModel");
+const pool = require("../db/pool");
 
 function extractIdempotencyKey(req) {
   return (
@@ -66,7 +67,17 @@ async function getOrders(req, res, next) {
       return res.status(200).json({ orders });
     }
 
-    return res.render("orders/index", { orders });
+    const itemsRes = await pool.query(
+      `SELECT id, name, price, stock_count
+       FROM public.items
+       ORDER BY name ASC, id ASC`,
+    );
+
+    return res.render("orders/index", {
+      orders,
+      catalogItems: itemsRes.rows,
+      currentUserRole: req.session?.role || "",
+    });
   } catch (err) {
     return next(err);
   }

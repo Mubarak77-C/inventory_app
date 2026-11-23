@@ -155,16 +155,17 @@ async function createOrder({
         }
 
         const currentStock = existsRes.rows[0].stock_count;
-        throw createDomainError(
-          `Insufficient stock for "${existsRes.rows[0].name}" (item #${reqItem.itemId}). Requested ${reqItem.quantity}, available ${currentStock}.`,
-          "INSUFFICIENT_STOCK",
-          409,
-          {
-            itemId: reqItem.itemId,
-            requested: reqItem.quantity,
-            available: currentStock,
-          },
-        );
+        const isOutOfStock = currentStock === 0;
+        const errorCode = isOutOfStock ? "OUT_OF_STOCK" : "INSUFFICIENT_STOCK";
+        const errorMessage = isOutOfStock
+          ? `"${existsRes.rows[0].name}" (item #${reqItem.itemId}) is out of stock (0 available).`
+          : `Insufficient stock for "${existsRes.rows[0].name}" (item #${reqItem.itemId}). Requested ${reqItem.quantity}, available ${currentStock}.`;
+
+        throw createDomainError(errorMessage, errorCode, 409, {
+          itemId: reqItem.itemId,
+          requested: reqItem.quantity,
+          available: currentStock,
+        });
       }
 
       const dbItem = updateRes.rows[0];

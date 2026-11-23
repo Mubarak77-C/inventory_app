@@ -15,6 +15,7 @@ const { attachUserToLocals } = require("./middleware/authMiddleware");
 const authRouter = require("./routes/authRouter");
 const itemRouter = require("./routes/itemRouter");
 const categoryRouter = require("./routes/categoryRouter");
+const orderRouter = require("./routes/orderRouter");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -115,6 +116,7 @@ app.get("/", (req, res) => {
 app.use("/", authRouter);
 app.use("/items", itemRouter);
 app.use("/categories", categoryRouter);
+app.use("/orders", orderRouter);
 
 // 6. 404 Catch-All Handler (MUST always stay at the very bottom)
 app.use((req, res) => {

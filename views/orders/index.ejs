@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orders — Punch &amp; History</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+    .row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.75rem; }
+    input, select, button { padding: 0.5rem 0.75rem; font-size: 0.95rem; }
+    button { cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    th, td { border: 1px solid #e2e2e2; padding: 0.5rem 0.65rem; text-align: left; }
+    th { background: #f7f7f7; }
+    .msg-ok { color: #155724; background: #d4edda; padding: 0.6rem 0.8rem; border-radius: 6px; }
+    .msg-err { color: #721c24; background: #f8d7da; padding: 0.6rem 0.8rem; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Orders</h1>
+
+  <section class="card">
+    <h2>Punch New Order</h2>
+    <form id="punch-order-form">
+      <div id="line-items">
+        <div class="row line-item">
+          <label>Item ID: <input type="number" name="itemId" min="1" required style="width: 90px;" /></label>
+          <label>Qty: <input type="number" name="quantity" min="1" value="1" required style="width: 80px;" /></label>
+          <button type="button" class="remove-row">Remove</button>
+        </div>
+      </div>
+      <div class="row">
+        <button type="button" id="add-row">+ Add Line Item</button>
+        <button type="submit">Punch Order</button>
+      </div>
+    </form>
+    <div id="feedback" style="margin-top: 0.75rem;"></div>
+  </section>
+
+  <section class="card">
+    <h2>Recent Orders</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Status</th>
+          <th>Total</th>
+          <th>Items</th>
+          <th>Created By</th>
+          <th>Created At</th>
+        </tr>
+      </thead>
+      <tbody id="orders-tbody">
+        <% if (!orders || orders.length === 0) { %>
+          <tr><td colspan="6">No orders yet.</td></tr>
+        <% } else { %>
+          <% orders.forEach((order) => { %>
+            <tr>
+              <td>#<%= order.id %></td>
+              <td><%= order.status %></td>
+              <td><%= Number(order.total_amount).toFixed(2) %></td>
+              <td>
+                <% (order.items || []).forEach((line, idx) => { %>
+                  <%= line.item_name %> &times; <%= line.quantity %> (<%= Number(line.line_total).toFixed(2) %>)<%= idx < order.items.length - 1 ? ", " : "" %>
+                <% }) %>
+              </td>
+              <td><%= order.created_by ?? "-" %></td>
+              <td><%= new Date(order.created_at).toLocaleString() %></td>
+            </tr>
+          <% }) %>
+        <% } %>
+      </tbody>
+    </table>
+  </section>
+
+  <script>
+    const lineItemsContainer = document.getElementById("line-items");
+    const addRowBtn = document.getElementById("add-row");
+    const form = document.getElementById("punch-order-form");
+    const feedback = document.getElementById("feedback");
+
+    function createKey() {
+      if (window.crypto && typeof window.crypto.randomUUID === "function") {
+        return window.crypto.randomUUID();
+      }
+      return "order-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+    }
+
+    let currentIdempotencyKey = createKey();
+
+    addRowBtn.addEventListener("click", () => {
+      const div = document.createElement("div");
+      div.className = "row line-item";
+      div.innerHTML = `
+        <label>Item ID: <input type="number" name="itemId" min="1" required style="width: 90px;" /></label>
+        <label>Qty: <input type="number" name="quantity" min="1" value="1" required style="width: 80px;" /></label>
+        <button type="button" class="remove-row">Remove</button>
+      `;
+      lineItemsContainer.appendChild(div);
+    });
+
+    lineItemsContainer.addEventListener("click", (e) => {
+      if (e.target.classList.contains("remove-row")) {
+        const rows = lineItemsContainer.querySelectorAll(".line-item");
+        if (rows.length > 1) e.target.closest(".line-item").remove();
+      }
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      feedback.innerHTML = "";
+
+      const rows = Array.from(lineItemsContainer.querySelectorAll(".line-item"));
+      const items = rows.map((row) => ({
+        itemId: Number(row.querySelector('input[name="itemId"]').value),
+        quantity: Number(row.querySelector('input[name="quantity"]').value),
+      }));
+
+      try {
+        const res = await fetch("/orders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Idempotency-Key": currentIdempotencyKey,
+          },
+          body: JSON.stringify({ idempotencyKey: currentIdempotencyKey, items }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Order failed."}</div>`;
+          return;
+        }
+
+        // Rotate key only after a successful order so the next order gets a fresh key
+        currentIdempotencyKey = createKey();
+        feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} punched (${data.order.status}) — Total: ${Number(data.order.total_amount).toFixed(2)}</div>`;
+        setTimeout(() => window.location.reload(), 500);
+      } catch (err) {
+        feedback.innerHTML = `<div class="msg-err">Network error while punching order.</div>`;
+      }
+    });
+  </script>
+</body>
+</html>

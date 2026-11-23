@@ -246,9 +246,10 @@ async function createOrder({
 }
 
 async function listOrders(limit = 50) {
+  const parsedLimit = Number(limit);
   const safeLimit =
-    Number.isInteger(Number(limit)) && Number(limit) > 0
-      ? Math.min(Number(limit), 200)
+    Number.isInteger(parsedLimit) && parsedLimit > 0
+      ? Math.min(parsedLimit, 200)
       : 50;
 
   const { rows } = await pool.query(

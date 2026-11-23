@@ -1,5 +1,6 @@
 // controllers/orderController.js
-const { createOrder } = require("../models/orderModel");
+
+const { createOrder, listOrders } = require("../models/orderModel");
 
 function extractIdempotencyKey(req) {
   return (
@@ -66,7 +67,6 @@ async function getOrders(req, res, next) {
     return next(err);
   }
 }
-
 module.exports = {
   punchOrder,
   getOrders,

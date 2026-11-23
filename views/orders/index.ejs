@@ -43,15 +43,15 @@
             Item:
             <select name="itemId" class="item-select" required>
               <option value="" data-price="0" data-stock="0">-- Select an item --</option>
-              <% (catalogItems || []).forEach((item) => { %>
-                <option
-                  value="<%= item.id %>"
-                  data-price="<%= Number(item.price) %>"
-                  data-stock="<%= Number(item.stock_count) %>"
-                >
-                  #<%= item.id %> — <%= item.name %> ($<%= Number(item.price).toFixed(2) %> | Stock: <%= item.stock_count %>)
-                </option>
-              <% }) %>
+              <% (catalogItems || []).filter((item) => Number(item.stock_count) > 0).forEach((item) => { %>
+  <option
+    value="<%= item.id %>"
+    data-price="<%= Number(item.price) %>"
+    data-stock="<%= Number(item.stock_count) %>"
+  >
+    #<%= item.id %> — <%= item.name %> ($<%= Number(item.price).toFixed(2) %> | Stock: <%= item.stock_count %>)
+  </option>
+<% }) %>
             </select>
           </label>
           <label>

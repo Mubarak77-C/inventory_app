@@ -351,3 +351,54 @@ Keep-Alive: timeout=5
 
 {"error":"Cannot transition order #2 from CANCELLED to CANCELLED.","code":"INVALID_STATUS_TRANSITION","orderId":2,"currentStatu
 ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 
+
+
+###output confirms your concurrent cancellation & restock logic is 100% working as intended:
+
+ # 0. Make sure /tmp/cookies.txt is authenticated 
+curl -s -c /tmp/cookies.txt -L -X POST http://localhost:3000/login \
+  -d "username=cashier1&password=Cashier@1234" > /dev/null
+
+# 1. Check item #1 stock BEFORE punching a new order
+docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, name, stock_count FROM items WHERE id = 1;"
+
+# 2. Punch a fresh order (say qty=1 of item #1) and capture its new order ID
+NEW_ORDER_ID=$(curl -s -b /tmp/cookies.txt -X POST http://localhost:3000/orders \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d "{\"idempotencyKey\":\"race-cancel-$(date +%s%N)\",\"items\":[{\"itemId\":1,\"quantity\":1}]}" \
+  | node -e "const d = JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d.order ? d.order.id : '');")
+
+echo "Created Order ID: $NEW_ORDER_ID"
+
+# 3. Check item #1 stock right AFTER punching (should be -1 compared to step 1)
+docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, name, stock_count FROM items WHERE id = 1;"
+
+  -c "SELECT id, name, stock_count FROM items WHERE id = 1;" \back to Step 1 (restocked ONCE, not twice)
+ id |    name    | stock_count 
+----+------------+-------------
+  1 | Chef Knife |          11
+(1 row)
+
+Created Order ID: 7
+ id |    name    | stock_count 
+----+------------+-------------
+  1 | Chef Knife |          10
+(1 row)
+
+[1] 20330
+[2] 20331
+Req1 HTTP: 200
+[1]-  Done                    curl -s -o /tmp/cancel_res_1.txt -w "Req1 HTTP: %{http_code}\n" -b /tmp/cookies.txt -X PATCH "http://localhost:3000/orders/${NEW_ORDER_ID}/status" -H "Content-Type: application/json" -H "Accept: application/json" -d '{"status":"CANCELLED"}'
+Req2 HTTP: 409
+[2]+  Done                    curl -s -o /tmp/cancel_res_2.txt -w "Req2 HTTP: %{http_code}\n" -b /tmp/cookies.txt -X PATCH "http://localhost:3000/orders/${NEW_ORDER_ID}/status" -H "Content-Type: application/json" -H "Accept: application/json" -d '{"status":"CANCELLED"}'
+--- Response 1 ---
+{"order":{"id":7,"idempotency_key":"race-cancel-1795448072296490758","status":"CANCELLED","total_amount":"45.99","created_by":3,"created_at":"2026-11-23T15:34:32.317Z"},"items":[{"id":8,"order_id":7,"item_id":1,"item_name":"Chef Knife","unit_price":"45.99","quantity":1,"line_total":"45.99"}],"restoredItems":[{"itemId":1,"restockedQuantity":1,"newStockCount":11}]}
+--- Response 2 ---
+{"error":"Cannot transition order #7 from CANCELLED to CANCELLED.","code":"INVALID_STATUS_TRANSITION","orderId":7,"currentStatus":"CANCELLED","attemptedStatus":"CANCELLED"}
+ id |    name    | stock_count 
+----+------------+-------------
+  1 | Chef Knife |          11
+(1 row)

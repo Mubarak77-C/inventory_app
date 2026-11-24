@@ -1,7 +1,12 @@
-node_modules;
-npm - debug.log.git.gitignore.env.env * pgdata;
-postgres_data;
-repomix - output.xml;
-repomix - output.txt;
-repomix - output.md;
-README.md;
+node_modules
+npm-debug.log*
+.git
+.gitignore
+.env
+.env.*
+pgdata
+postgres_data
+testing
+repomix-output.*
+README.md
+*.xml

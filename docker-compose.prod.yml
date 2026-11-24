@@ -1,35 +1,30 @@
 services:
   app:
     build: .
-    container_name: inventory_node_prod
     ports:
       - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://my_user:${DB_PASSWORD}@postgres:5432/inventory_db
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-    command: npm start
+    env_file:
+      - .env
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
-    restart: always
+    restart: unless-stopped
 
-  postgres:
-    image: pgvector/pgvector:pg15
-    container_name: inventory_postgres_prod
+  db:
+    image: postgres:16-alpine
     environment:
-      - POSTGRES_USER=my_user
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=inventory_db
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U my_user -d inventory_db"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
       timeout: 5s
       retries: 5
-    restart: always
+    restart: unless-stopped
 
 volumes:
-  - pgdata:/var/lib/postgresql/data
-    - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  pgdata:

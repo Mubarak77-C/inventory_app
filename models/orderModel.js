@@ -10,6 +10,17 @@ const VALID_STATUSES = new Set([
   "CANCELLED",
 ]);
 
+const VALID_PAYMENT_METHODS = new Set(["CASH", "CARD", "UPI"]);
+
+const ALLOWED_TRANSITIONS = {
+  PENDING: new Set(["PREPARING", "CANCELLED"]),
+  PREPARING: new Set(["READY", "CANCELLED"]),
+  READY: new Set(["SERVED", "CANCELLED"]),
+  SERVED: new Set(["COMPLETED"]),
+  COMPLETED: new Set([]),
+  CANCELLED: new Set([]),
+};
+
 function createDomainError(message, code, statusCode = 400, meta = {}) {
   const err = new Error(message);
   err.code = code;
@@ -52,10 +63,13 @@ function normalizeAndAggregateItems(rawItems) {
     aggregated.set(itemId, (aggregated.get(itemId) || 0) + quantity);
   }
 
-  return Array.from(aggregated.entries()).map(([itemId, quantity]) => ({
-    itemId,
-    quantity,
-  }));
+  // Deterministic itemId order prevents multi-item lock deadlocks
+  return Array.from(aggregated.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([itemId, quantity]) => ({
+      itemId,
+      quantity,
+    }));
 }
 
 async function getOrderWithItemsByIdempotencyKey(clientOrPool, idempotencyKey) {
@@ -77,14 +91,28 @@ async function getOrderWithItemsByIdempotencyKey(clientOrPool, idempotencyKey) {
   };
 }
 
+async function getOrderWithItemsById(clientOrPool, orderId) {
+  const orderRes = await clientOrPool.query(
+    `SELECT * FROM public.orders WHERE id = $1`,
+    [orderId],
+  );
+  const order = orderRes.rows[0];
+  if (!order) return null;
+
+  const itemsRes = await clientOrPool.query(
+    `SELECT * FROM public.order_items WHERE order_id = $1 ORDER BY id ASC`,
+    [order.id],
+  );
+
+  return {
+    order,
+    items: itemsRes.rows,
+  };
+}
+
 /**
- * Atomically creates an order, snapshots item name & price, and deducts items.stock_count.
- *
- * @param {Object} params
- * @param {string} params.idempotencyKey
- * @param {Array<{itemId?: number, item_id?: number, quantity: number}>} params.items
- * @param {number|null} [params.createdBy=null]
- * @param {string} [params.status="PENDING"]
+ * Atomically creates an order, snapshots item name & price, deducts items.stock_count,
+ * and writes the initial PENDING entry to order_status_history.
  */
 async function createOrder({
   idempotencyKey,
@@ -113,6 +141,10 @@ async function createOrder({
 
   const cleanKey = idempotencyKey.trim();
   const requestedItems = normalizeAndAggregateItems(items);
+  const actorId =
+    Number.isInteger(Number(createdBy)) && Number(createdBy) > 0
+      ? Number(createdBy)
+      : null;
 
   const client = await pool.connect();
 
@@ -187,19 +219,19 @@ async function createOrder({
       `INSERT INTO public.orders (idempotency_key, status, total_amount, created_by)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [cleanKey, status, totalAmount.toFixed(2), createdBy],
+      [cleanKey, status, totalAmount.toFixed(2), actorId],
     );
     const createdOrder = orderInsertRes.rows[0];
 
-    // Log initial order creation in audit history
+    // 4. Log initial order creation in audit history
     await client.query(
       `INSERT INTO public.order_status_history
          (order_id, from_status, to_status, changed_by, reason)
        VALUES ($1, NULL, $2, $3, $4)`,
-      [createdOrder.id, status, createdBy, "Order punched"],
+      [createdOrder.id, status, actorId, "Order punched"],
     );
 
-    // 4. Insert order_items snapshot rows
+    // 5. Insert order_items snapshot rows
     const insertedItems = [];
     for (const snap of lineSnapshots) {
       const itemInsertRes = await client.query(
@@ -233,7 +265,6 @@ async function createOrder({
       console.error("Failed to rollback order transaction:", rollbackErr);
     }
 
-    // Handle concurrent duplicate idempotency_key race cleanly
     if (
       err.code === "23505" &&
       err.constraint === "orders_idempotency_key_key"
@@ -266,6 +297,10 @@ async function listOrders(limit = 50) {
        o.idempotency_key,
        o.status,
        o.total_amount,
+       o.payment_method,
+       o.payment_status,
+       o.payment_reference,
+       o.paid_at,
        o.created_by,
        o.created_at,
        COALESCE(
@@ -292,43 +327,19 @@ async function listOrders(limit = 50) {
   return rows;
 }
 
-const ALLOWED_TRANSITIONS = {
-  PENDING: new Set(["PREPARING", "CANCELLED"]),
-  PREPARING: new Set(["READY", "CANCELLED"]),
-  READY: new Set(["SERVED", "COMPLETED", "CANCELLED"]),
-  SERVED: new Set(["COMPLETED"]),
-  COMPLETED: new Set([]),
-  CANCELLED: new Set([]),
-};
-
-async function getOrderWithItemsById(clientOrPool, orderId) {
-  const orderRes = await clientOrPool.query(
-    `SELECT * FROM public.orders WHERE id = $1`,
-    [orderId],
-  );
-  const order = orderRes.rows[0];
-  if (!order) return null;
-
-  const itemsRes = await clientOrPool.query(
-    `SELECT * FROM public.order_items WHERE order_id = $1 ORDER BY id ASC`,
-    [order.id],
-  );
-
-  return {
-    order,
-    items: itemsRes.rows,
-  };
-}
-
 /**
  * Transitions an order's status inside a transaction.
- * If transitioning to CANCELLED, atomically restores items.stock_count for all line items.
+ * - Restocks items when moving to CANCELLED.
+ * - Requires and records payment_method (CASH, CARD, UPI) when moving to COMPLETED.
+ * - Appends an audit row to order_status_history.
  */
 async function transitionOrderStatus({
   orderId,
   nextStatus,
   changedBy = null,
   reason = null,
+  paymentMethod = null,
+  paymentReference = null,
 }) {
   const numericOrderId = Number(orderId);
   if (!Number.isInteger(numericOrderId) || numericOrderId <= 0) {
@@ -360,12 +371,35 @@ async function transitionOrderStatus({
       ? reason.trim().slice(0, 250)
       : null;
 
+  let normalizedPaymentMethod = null;
+  let cleanPaymentReference = null;
+
+  if (normalizedStatus === "COMPLETED") {
+    normalizedPaymentMethod =
+      typeof paymentMethod === "string"
+        ? paymentMethod.trim().toUpperCase()
+        : "";
+
+    if (!VALID_PAYMENT_METHODS.has(normalizedPaymentMethod)) {
+      throw createDomainError(
+        "Payment method is required when completing an order (CASH, CARD, or UPI).",
+        "PAYMENT_METHOD_REQUIRED",
+        400,
+      );
+    }
+
+    cleanPaymentReference =
+      typeof paymentReference === "string" && paymentReference.trim().length > 0
+        ? paymentReference.trim().slice(0, 120)
+        : null;
+  }
+
   const client = await pool.connect();
 
   try {
     await client.query("BEGIN");
 
-    // Lock the order row to serialize concurrent status/cancellation requests
+    // Lock the order row to serialize concurrent status/cancellation/payment requests
     const lockRes = await client.query(
       `SELECT * FROM public.orders WHERE id = $1 FOR UPDATE`,
       [numericOrderId],
@@ -427,18 +461,42 @@ async function transitionOrderStatus({
       }
     }
 
-    await client.query(
-      `UPDATE public.orders
-       SET status = $1
-       WHERE id = $2`,
-      [normalizedStatus, numericOrderId],
-    );
+    if (normalizedStatus === "COMPLETED") {
+      await client.query(
+        `UPDATE public.orders
+         SET status = $1,
+             payment_method = $2,
+             payment_status = 'PAID',
+             payment_reference = $3,
+             paid_at = NOW()
+         WHERE id = $4`,
+        [
+          normalizedStatus,
+          normalizedPaymentMethod,
+          cleanPaymentReference,
+          numericOrderId,
+        ],
+      );
+    } else {
+      await client.query(
+        `UPDATE public.orders
+         SET status = $1
+         WHERE id = $2`,
+        [normalizedStatus, numericOrderId],
+      );
+    }
+
+    const historyReason =
+      cleanReason ||
+      (normalizedStatus === "COMPLETED"
+        ? `Paid via ${normalizedPaymentMethod}`
+        : null);
 
     await client.query(
       `INSERT INTO public.order_status_history
          (order_id, from_status, to_status, changed_by, reason)
        VALUES ($1, $2, $3, $4, $5)`,
-      [numericOrderId, currentStatus, normalizedStatus, actorId, cleanReason],
+      [numericOrderId, currentStatus, normalizedStatus, actorId, historyReason],
     );
 
     const updated = await getOrderWithItemsById(client, numericOrderId);

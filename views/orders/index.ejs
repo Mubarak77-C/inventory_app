@@ -28,7 +28,8 @@
     .badge-CANCELLED { background: #fee2e2; color: #991b1b; }
     .msg-ok { color: #065f46; background: #d1fae5; border: 1px solid #6ee7b7; padding: 0.65rem 0.85rem; border-radius: 6px; }
     .msg-err { color: #991b1b; background: #fee2e2; border: 1px solid #fca5a5; padding: 0.65rem 0.85rem; border-radius: 6px; }
-    .actions-cell { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .actions-cell { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+    .pay-meta { display: block; font-size: 0.76rem; color: #166534; margin-top: 0.2rem; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -44,14 +45,14 @@
             <select name="itemId" class="item-select" required>
               <option value="" data-price="0" data-stock="0">-- Select an item --</option>
               <% (catalogItems || []).filter((item) => Number(item.stock_count) > 0).forEach((item) => { %>
-  <option
-    value="<%= item.id %>"
-    data-price="<%= Number(item.price) %>"
-    data-stock="<%= Number(item.stock_count) %>"
-  >
-    #<%= item.id %> — <%= item.name %> ($<%= Number(item.price).toFixed(2) %> | Stock: <%= item.stock_count %>)
-  </option>
-<% }) %>
+                <option
+                  value="<%= item.id %>"
+                  data-price="<%= Number(item.price) %>"
+                  data-stock="<%= Number(item.stock_count) %>"
+                >
+                  #<%= item.id %> — <%= item.name %> ($<%= Number(item.price).toFixed(2) %> | Stock: <%= item.stock_count %>)
+                </option>
+              <% }) %>
             </select>
           </label>
           <label>
@@ -107,7 +108,12 @@
           %>
             <tr>
               <td><strong>#<%= order.id %></strong></td>
-              <td><span class="badge badge-<%= st %>"><%= st %></span></td>
+              <td>
+                <span class="badge badge-<%= st %>"><%= st %></span>
+                <% if (st === "COMPLETED" && order.payment_method) { %>
+                  <span class="pay-meta">PAID · <%= order.payment_method %></span>
+                <% } %>
+              </td>
               <td>$<%= Number(order.total_amount).toFixed(2) %></td>
               <td>
                 <% (order.items || []).forEach((line, idx) => { %>
@@ -116,12 +122,26 @@
               </td>
               <td><%= order.created_by ?? "-" %></td>
               <td>
-              <time class="order-time" datetime="<%= new Date(order.created_at).toISOString() %>">
-              <%= new Date(order.created_at).toISOString() %>
-              </time>
+                <time class="order-time" datetime="<%= new Date(order.created_at).toISOString() %>">
+                  <%= new Date(order.created_at).toISOString() %>
+                </time>
               </td>
               <td class="actions-cell">
-                <% if (nextStatus) { %>
+                <% if (st === "SERVED") { %>
+                  <select class="payment-method-select" data-order-id="<%= order.id %>" aria-label="Payment method">
+                    <option value="CASH">CASH</option>
+                    <option value="CARD">CARD</option>
+                    <option value="UPI">UPI</option>
+                  </select>
+                  <button
+                    type="button"
+                    class="status-btn"
+                    data-order-id="<%= order.id %>"
+                    data-next-status="COMPLETED"
+                  >
+                    Mark COMPLETED
+                  </button>
+                <% } else if (nextStatus) { %>
                   <button
                     type="button"
                     class="status-btn"
@@ -251,12 +271,11 @@
 
         currentIdempotencyKey = createKey();
         feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} created (${data.order.status}) — Total: $${Number(data.order.total_amount).toFixed(2)}</div>`;
-        // Reset form rows & subtotal before reloading fresh stock counts
-form.reset();
-recalcSubtotal();
-setTimeout(() => {
-  window.location.href = "/orders?_=" + Date.now();
-}, 350);
+        form.reset();
+        recalcSubtotal();
+        setTimeout(() => {
+          window.location.href = "/orders?_=" + Date.now();
+        }, 350);
       } catch (err) {
         feedback.innerHTML = `<div class="msg-err">Network error while punching order.</div>`;
       }
@@ -272,6 +291,14 @@ setTimeout(() => {
           return;
         }
 
+        const payload = { status: nextStatus };
+
+        if (nextStatus === "COMPLETED") {
+          const row = btn.closest("tr");
+          const methodSelect = row ? row.querySelector(".payment-method-select") : null;
+          payload.paymentMethod = methodSelect ? methodSelect.value : "CASH";
+        }
+
         btn.disabled = true;
         try {
           const res = await fetch(`/orders/${orderId}/status`, {
@@ -280,7 +307,7 @@ setTimeout(() => {
               "Content-Type": "application/json",
               "Accept": "application/json",
             },
-            body: JSON.stringify({ status: nextStatus }),
+            body: JSON.stringify(payload),
           });
 
           const data = await res.json();
@@ -295,8 +322,14 @@ setTimeout(() => {
             Array.isArray(data.restoredItems) && data.restoredItems.length > 0
               ? ` (Restocked ${data.restoredItems.length} item line(s))`
               : "";
-          feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} is now <strong>${data.order.status}</strong>${restockNote}.</div>`;
-          setTimeout(() => window.location.reload(), 350);
+          const paidNote =
+            nextStatus === "COMPLETED" && data.order?.payment_method
+              ? ` [PAID via ${data.order.payment_method}]`
+              : "";
+          feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} is now <strong>${data.order.status}</strong>${paidNote}${restockNote}.</div>`;
+          setTimeout(() => {
+            window.location.href = "/orders?_=" + Date.now();
+          }, 350);
         } catch (err) {
           feedback.innerHTML = `<div class="msg-err">Network error while updating status.</div>`;
           btn.disabled = false;
@@ -305,15 +338,15 @@ setTimeout(() => {
     });
 
     document.querySelectorAll(".order-time").forEach((el) => {
-  const iso = el.getAttribute("datetime");
-  if (!iso) return;
-  const dt = new Date(iso);
-  el.textContent = new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "medium",
-  }).format(dt);
-  el.title = `UTC: ${iso}`;
-});
+      const iso = el.getAttribute("datetime");
+      if (!iso) return;
+      const dt = new Date(iso);
+      el.textContent = new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "medium",
+      }).format(dt);
+      el.title = `UTC: ${iso}`;
+    });
 
     recalcSubtotal();
   </script>

@@ -95,7 +95,10 @@ async function updateOrderStatus(req, res, next) {
       orderId: id,
       nextStatus,
       changedBy,
-      reason,
+      reason: req.body?.reason,
+      paymentMethod: req.body?.paymentMethod ?? req.body?.payment_method,
+      paymentReference:
+        req.body?.paymentReference ?? req.body?.payment_reference,
     });
 
     return res.status(200).json({

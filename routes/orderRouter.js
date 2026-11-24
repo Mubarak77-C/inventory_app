@@ -20,4 +20,10 @@ router.put(
   requireRole("admin", "cashier"),
   orderController.editOrder,
 );
+router.post(
+  "/:id/payment-intent",
+  requireAuth,
+  requireRole("admin", "cashier"),
+  orderController.createPaymentIntent,
+);
 module.exports = router;

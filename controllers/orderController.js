@@ -6,6 +6,7 @@ const {
   transitionOrderStatus,
   editOrderItems,
 } = require("../models/orderModel");
+const { initiateOrderPaymentAttempt } = require("../models/paymentModel");
 const pool = require("../db/pool");
 
 function extractIdempotencyKey(req) {
@@ -171,10 +172,57 @@ async function editOrder(req, res, next) {
     return next(err);
   }
 }
+
+async function createPaymentIntent(req, res) {
+  try {
+    const orderId = Number(req.params.id);
+    const { paymentMethod, currency, idempotencyKey, simulateOutcome } =
+      req.body || {};
+
+    const headerIdempotencyKey = req.get("Idempotency-Key");
+    const effectiveKey = idempotencyKey || headerIdempotencyKey || null;
+
+    // Only allow simulateOutcome in non-production environments for local/sandbox testing
+    const safeSimulateOutcome =
+      process.env.NODE_ENV !== "production" &&
+      (simulateOutcome === "APPROVE" || simulateOutcome === "DECLINE")
+        ? simulateOutcome
+        : null;
+
+    const result = await initiateOrderPaymentAttempt({
+      orderId,
+      paymentMethod,
+      currency: currency || "INR",
+      idempotencyKey: effectiveKey,
+      simulateOutcome: safeSimulateOutcome,
+    });
+
+    const httpStatus = result.replayed ? 200 : 201;
+    return res.status(httpStatus).json({
+      replayed: result.replayed,
+      order: result.order,
+      paymentAttempt: result.attempt,
+    });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({
+        code: err.code || "PAYMENT_ATTEMPT_ERROR",
+        error: err.message,
+      });
+    }
+
+    console.error("Error creating payment intent:", err);
+    return res.status(500).json({
+      code: "INTERNAL_SERVER_ERROR",
+      error: "Failed to initiate payment attempt.",
+    });
+  }
+}
 module.exports = {
   punchOrder,
   getOrders,
   transitionOrderStatus,
   updateOrderStatus,
   editOrder,
+  createPaymentIntent,
 };

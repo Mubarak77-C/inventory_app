@@ -31,7 +31,13 @@ app.set("view engine", "ejs");
 
 // 2. Body Parsers & Method Override (MUST come before session & routes)
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
 app.use(methodOverride("_method"));
 
 // 3. Session Store & User Locals (MUST come before all routers)

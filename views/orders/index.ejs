@@ -68,10 +68,16 @@
         <div class="row" style="margin-bottom: 0;">
           <button type="button" id="add-row">+ Add Line Item</button>
           <button type="submit" class="btn-primary">Punch Order</button>
-        </div>
-        <div>
-          Estimated Subtotal: <strong id="estimated-total">$0.00</strong>
-        </div>
+          <select id="quick-payment-method" aria-label="Quick payment method">
+      <option value="CASH">CASH</option>
+      <option value="CARD">CARD</option>
+      <option value="UPI">UPI</option>
+    </select>
+    <button type="button" id="quick-pay-btn" class="btn-primary">Quick Payment</button>
+  </div>
+  <div>
+    Estimated Subtotal: <strong id="estimated-total">$0.00</strong>
+  </div>
       </div>
     </form>
     <div id="feedback" style="margin-top: 0.75rem;"></div>
@@ -178,6 +184,8 @@
     const form = document.getElementById("punch-order-form");
     const feedback = document.getElementById("feedback");
     const estimatedTotalEl = document.getElementById("estimated-total");
+    const quickPayBtn = document.getElementById("quick-pay-btn");
+    const quickPaySelect = document.getElementById("quick-payment-method");
 
     function createKey() {
       if (window.crypto && typeof window.crypto.randomUUID === "function") {
@@ -347,6 +355,67 @@
       }).format(dt);
       el.title = `UTC: ${iso}`;
     });
+
+    async function submitOrder(targetStatus, paymentMethod = null) {
+  feedback.innerHTML = "";
+
+  const items = Array.from(lineItemsContainer.querySelectorAll(".line-item")).map((row) => ({
+    itemId: Number(row.querySelector(".item-select").value),
+    quantity: Number(row.querySelector(".qty-input").value),
+  }));
+
+  const bodyPayload = {
+    idempotencyKey: currentIdempotencyKey,
+    items,
+    status: targetStatus,
+  };
+  if (paymentMethod) {
+    bodyPayload.paymentMethod = paymentMethod;
+  }
+
+  try {
+    const res = await fetch("/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Idempotency-Key": currentIdempotencyKey,
+      },
+      body: JSON.stringify(bodyPayload),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Order failed."}</div>`;
+      return;
+    }
+
+    currentIdempotencyKey = createKey();
+    const paidTag =
+      data.order.payment_status === "PAID"
+        ? ` · PAID (${data.order.payment_method})`
+        : "";
+    feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} created (${data.order.status}${paidTag}) — Total: $${Number(data.order.total_amount).toFixed(2)}</div>`;
+    form.reset();
+    recalcSubtotal();
+    setTimeout(() => {
+      window.location.href = "/orders?_=" + Date.now();
+    }, 350);
+  } catch (err) {
+    feedback.innerHTML = `<div class="msg-err">Network error while punching order.</div>`;
+  }
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  await submitOrder("PENDING", null);
+});
+
+quickPayBtn.addEventListener("click", async () => {
+  if (!form.reportValidity()) return;
+  await submitOrder("COMPLETED", quickPaySelect.value);
+});
 
     recalcSubtotal();
   </script>

@@ -22,13 +22,17 @@ async function punchOrder(req, res, next) {
     const idempotencyKey = extractIdempotencyKey(req);
     const items = req.body?.items;
     const status = req.body?.status || "PENDING";
-    const createdBy = req.session?.userId ?? null;
+    const createdBy =
+      req.session?.userId ?? req.session?.user?.id ?? req.user?.id ?? null;
 
     const result = await createOrder({
       idempotencyKey,
       items,
       createdBy,
       status,
+      paymentMethod: req.body?.paymentMethod ?? req.body?.payment_method,
+      paymentReference:
+        req.body?.paymentReference ?? req.body?.payment_reference,
     });
 
     const httpStatus = result.idempotentReplay ? 200 : 201;

@@ -119,6 +119,8 @@ async function createOrder({
   items,
   createdBy = null,
   status = "PENDING",
+  paymentMethod = null,
+  paymentReference = null,
 }) {
   if (
     typeof idempotencyKey !== "string" ||
@@ -131,12 +133,38 @@ async function createOrder({
     );
   }
 
-  if (!VALID_STATUSES.has(status)) {
+  const normalizedStatus =
+    typeof status === "string" ? status.trim().toUpperCase() : "PENDING";
+
+  if (!VALID_STATUSES.has(normalizedStatus)) {
     throw createDomainError(
       `Invalid order status: ${status}.`,
       "INVALID_ORDER_STATUS",
       400,
     );
+  }
+
+  let normalizedPaymentMethod = null;
+  let cleanPaymentReference = null;
+
+  if (normalizedStatus === "COMPLETED") {
+    normalizedPaymentMethod =
+      typeof paymentMethod === "string"
+        ? paymentMethod.trim().toUpperCase()
+        : "";
+
+    if (!VALID_PAYMENT_METHODS.has(normalizedPaymentMethod)) {
+      throw createDomainError(
+        "Payment method is required for quick payment (CASH, CARD, or UPI).",
+        "PAYMENT_METHOD_REQUIRED",
+        400,
+      );
+    }
+
+    cleanPaymentReference =
+      typeof paymentReference === "string" && paymentReference.trim().length > 0
+        ? paymentReference.trim().slice(0, 120)
+        : null;
   }
 
   const cleanKey = idempotencyKey.trim();
@@ -214,21 +242,44 @@ async function createOrder({
       });
     }
 
-    // 3. Insert order header
+    // 3. Insert order header (with PAID fields when quick-paid)
+    const isPaid = normalizedStatus === "COMPLETED";
     const orderInsertRes = await client.query(
-      `INSERT INTO public.orders (idempotency_key, status, total_amount, created_by)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO public.orders (
+         idempotency_key,
+         status,
+         total_amount,
+         payment_method,
+         payment_status,
+         payment_reference,
+         paid_at,
+         created_by
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [cleanKey, status, totalAmount.toFixed(2), actorId],
+      [
+        cleanKey,
+        normalizedStatus,
+        totalAmount.toFixed(2),
+        isPaid ? normalizedPaymentMethod : null,
+        isPaid ? "PAID" : "UNPAID",
+        isPaid ? cleanPaymentReference : null,
+        isPaid ? new Date() : null,
+        actorId,
+      ],
     );
     const createdOrder = orderInsertRes.rows[0];
 
     // 4. Log initial order creation in audit history
+    const initialReason = isPaid
+      ? `Quick paid via ${normalizedPaymentMethod}`
+      : "Order punched";
+
     await client.query(
       `INSERT INTO public.order_status_history
          (order_id, from_status, to_status, changed_by, reason)
        VALUES ($1, NULL, $2, $3, $4)`,
-      [createdOrder.id, status, actorId, "Order punched"],
+      [createdOrder.id, normalizedStatus, actorId, initialReason],
     );
 
     // 5. Insert order_items snapshot rows
@@ -283,7 +334,6 @@ async function createOrder({
     client.release();
   }
 }
-
 async function listOrders(limit = 50) {
   const parsedLimit = Number(limit);
   const safeLimit =

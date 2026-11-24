@@ -4,6 +4,7 @@ const {
   createOrder,
   listOrders,
   transitionOrderStatus,
+  editOrderItems,
 } = require("../models/orderModel");
 const pool = require("../db/pool");
 

@@ -13,9 +13,9 @@ const VALID_STATUSES = new Set([
 const VALID_PAYMENT_METHODS = new Set(["CASH", "CARD", "UPI"]);
 
 const ALLOWED_TRANSITIONS = {
-  PENDING: new Set(["PREPARING", "CANCELLED"]),
-  PREPARING: new Set(["READY", "CANCELLED"]),
-  READY: new Set(["SERVED", "CANCELLED"]),
+  PENDING: new Set(["PREPARING", "CANCELLED", "COMPLETED"]),
+  PREPARING: new Set(["READY", "CANCELLED", "COMPLETED"]),
+  READY: new Set(["SERVED", "CANCELLED", "COMPLETED"]),
   SERVED: new Set(["COMPLETED"]),
   COMPLETED: new Set([]),
   CANCELLED: new Set([]),

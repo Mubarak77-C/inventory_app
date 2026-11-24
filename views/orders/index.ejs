@@ -207,6 +207,23 @@
                 <% if (!canEdit && !nextStatus && !canCancel) { %>
                   <span style="color: #6b7280;">—</span>
                 <% } %>
+
+                <% if (st !== "COMPLETED" && st !== "CANCELLED") { %>
+  <select class="quick-row-payment-select" data-order-id="<%= order.id %>" aria-label="Quick pay method">
+    <option value="CASH">CASH</option>
+    <option value="CARD">CARD</option>
+    <option value="UPI">UPI</option>
+  </select>
+  <button
+    type="button"
+    class="status-btn"
+    data-order-id="<%= order.id %>"
+    data-next-status="COMPLETED"
+    data-payment-selector=".quick-row-payment-select"
+  >
+    Quick Pay
+  </button>
+<% } %>
               </td>
             </tr>
           <% }) %>
@@ -512,12 +529,14 @@
 
         const payload = { status: nextStatus };
 
-        if (nextStatus === "COMPLETED") {
-          const row = btn.closest("tr");
-          const methodSelect = row ? row.querySelector(".payment-method-select") : null;
-          payload.paymentMethod = methodSelect ? methodSelect.value : "CASH";
-        }
-
+      if (nextStatus === "COMPLETED") {
+  const row = btn.closest("tr");
+  const customSelector = btn.dataset.paymentSelector;
+  const methodSelect = row
+    ? row.querySelector(customSelector || ".payment-method-select")
+    : null;
+  payload.paymentMethod = methodSelect ? methodSelect.value : "CASH";
+}
         btn.disabled = true;
         try {
           const res = await fetch(`/orders/${orderId}/status`, {

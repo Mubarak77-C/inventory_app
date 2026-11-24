@@ -570,9 +570,249 @@ async function transitionOrderStatus({
   }
 }
 
+const EDITABLE_STATUSES = new Set(["PENDING", "PREPARING", "READY", "SERVED"]);
+
+/**
+ * Atomically updates an active order's line items, adjusts items.stock_count by delta,
+ * recalculates orders.total_amount, and logs the edit in order_status_history.
+ */
+async function editOrderItems({
+  orderId,
+  items,
+  changedBy = null,
+  reason = null,
+}) {
+  const numericOrderId = Number(orderId);
+  if (!Number.isInteger(numericOrderId) || numericOrderId <= 0) {
+    throw createDomainError(
+      `Invalid orderId: ${orderId}. Must be a positive integer.`,
+      "INVALID_ORDER_ID",
+      400,
+    );
+  }
+
+  const nextItems = normalizeAndAggregateItems(items);
+  const actorId =
+    Number.isInteger(Number(changedBy)) && Number(changedBy) > 0
+      ? Number(changedBy)
+      : null;
+
+  const cleanReason =
+    typeof reason === "string" && reason.trim().length > 0
+      ? reason.trim().slice(0, 250)
+      : null;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // 1. Lock the order row first
+    const orderLockRes = await client.query(
+      `SELECT * FROM public.orders WHERE id = $1 FOR UPDATE`,
+      [numericOrderId],
+    );
+
+    if (orderLockRes.rowCount === 0) {
+      throw createDomainError(
+        `Order #${numericOrderId} not found.`,
+        "ORDER_NOT_FOUND",
+        404,
+        { orderId: numericOrderId },
+      );
+    }
+
+    const currentOrder = orderLockRes.rows[0];
+    if (!EDITABLE_STATUSES.has(currentOrder.status)) {
+      throw createDomainError(
+        `Cannot edit order #${numericOrderId} while status is ${currentOrder.status}.`,
+        "ORDER_NOT_EDITABLE",
+        409,
+        { orderId: numericOrderId, currentStatus: currentOrder.status },
+      );
+    }
+
+    // 2. Fetch existing order_items
+    const existingItemsRes = await client.query(
+      `SELECT item_id, quantity
+       FROM public.order_items
+       WHERE order_id = $1
+       ORDER BY item_id ASC`,
+      [numericOrderId],
+    );
+
+    const oldQtyByItem = new Map();
+    for (const row of existingItemsRes.rows) {
+      oldQtyByItem.set(Number(row.item_id), Number(row.quantity));
+    }
+
+    const newQtyByItem = new Map();
+    for (const entry of nextItems) {
+      newQtyByItem.set(entry.itemId, entry.quantity);
+    }
+
+    // 3. Collect all itemIds involved in deterministic ascending order to avoid deadlocks
+    const allItemIds = Array.from(
+      new Set([...oldQtyByItem.keys(), ...newQtyByItem.keys()]),
+    ).sort((a, b) => a - b);
+
+    const stockChanges = [];
+    const catalogById = new Map();
+
+    for (const itemId of allItemIds) {
+      const itemRes = await client.query(
+        `SELECT id, name, price, stock_count
+         FROM public.items
+         WHERE id = $1
+         FOR UPDATE`,
+        [itemId],
+      );
+
+      if (newQtyByItem.has(itemId) && itemRes.rowCount === 0) {
+        throw createDomainError(
+          `Item #${itemId} does not exist.`,
+          "ITEM_NOT_FOUND",
+          404,
+          { itemId },
+        );
+      }
+
+      if (itemRes.rowCount > 0) {
+        catalogById.set(itemId, itemRes.rows[0]);
+      }
+
+      const oldQty = oldQtyByItem.get(itemId) || 0;
+      const newQty = newQtyByItem.get(itemId) || 0;
+      const delta = newQty - oldQty;
+
+      if (delta > 0) {
+        const deductRes = await client.query(
+          `UPDATE public.items
+           SET stock_count = stock_count - $1
+           WHERE id = $2 AND stock_count >= $1
+           RETURNING id, stock_count`,
+          [delta, itemId],
+        );
+
+        if (deductRes.rowCount === 0) {
+          const dbItem = catalogById.get(itemId);
+          const avail = dbItem ? Number(dbItem.stock_count) : 0;
+          const code = avail === 0 ? "OUT_OF_STOCK" : "INSUFFICIENT_STOCK";
+          const msg =
+            avail === 0
+              ? `"${dbItem.name}" (item #${itemId}) is out of stock (0 available).`
+              : `Insufficient stock for "${dbItem.name}" (item #${itemId}). Need +${delta}, available ${avail}.`;
+
+          throw createDomainError(msg, code, 409, {
+            itemId,
+            requestedAdditional: delta,
+            available: avail,
+          });
+        }
+
+        stockChanges.push({
+          itemId,
+          delta: -delta,
+          newStockCount: deductRes.rows[0].stock_count,
+        });
+      } else if (delta < 0) {
+        const restoreQty = Math.abs(delta);
+        const restoreRes = await client.query(
+          `UPDATE public.items
+           SET stock_count = stock_count + $1
+           WHERE id = $2
+           RETURNING id, stock_count`,
+          [restoreQty, itemId],
+        );
+
+        if (restoreRes.rowCount > 0) {
+          stockChanges.push({
+            itemId,
+            delta: restoreQty,
+            newStockCount: restoreRes.rows[0].stock_count,
+          });
+        }
+      }
+    }
+
+    // 4. Replace line items and recompute order total from DB prices
+    await client.query(`DELETE FROM public.order_items WHERE order_id = $1`, [
+      numericOrderId,
+    ]);
+
+    let totalAmount = 0;
+    const summaryParts = [];
+
+    for (const entry of nextItems) {
+      const dbItem = catalogById.get(entry.itemId);
+      const unitPrice = Number(dbItem.price);
+      const lineTotal = Number((unitPrice * entry.quantity).toFixed(2));
+      totalAmount = Number((totalAmount + lineTotal).toFixed(2));
+
+      await client.query(
+        `INSERT INTO public.order_items
+           (order_id, item_id, item_name, unit_price, quantity, line_total)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          numericOrderId,
+          dbItem.id,
+          dbItem.name,
+          dbItem.price,
+          entry.quantity,
+          lineTotal.toFixed(2),
+        ],
+      );
+
+      summaryParts.push(`${dbItem.name} x${entry.quantity}`);
+    }
+
+    await client.query(
+      `UPDATE public.orders
+       SET total_amount = $1
+       WHERE id = $2`,
+      [totalAmount.toFixed(2), numericOrderId],
+    );
+
+    // 5. Audit log entry inside the same transaction
+    const auditReason =
+      cleanReason || `Order edited: ${summaryParts.join(", ")}`;
+
+    await client.query(
+      `INSERT INTO public.order_status_history
+         (order_id, from_status, to_status, changed_by, reason)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        numericOrderId,
+        currentOrder.status,
+        currentOrder.status,
+        actorId,
+        auditReason.slice(0, 250),
+      ],
+    );
+
+    const updated = await getOrderWithItemsById(client, numericOrderId);
+    await client.query("COMMIT");
+
+    return {
+      order: updated.order,
+      items: updated.items,
+      stockChanges,
+    };
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackErr) {
+      console.error("Failed to rollback order edit:", rollbackErr);
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 module.exports = {
   createOrder,
   getOrderWithItemsByIdempotencyKey,
   listOrders,
   transitionOrderStatus,
+  editOrderItems,
 };

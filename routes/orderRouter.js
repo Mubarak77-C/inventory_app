@@ -14,4 +14,10 @@ router.patch(
   requireRole("admin", "cashier"),
   orderController.updateOrderStatus,
 );
+
+router.put(
+  "/:id/items",
+  requireRole("admin", "cashier"),
+  orderController.editOrder,
+);
 module.exports = router;

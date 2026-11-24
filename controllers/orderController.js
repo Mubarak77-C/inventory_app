@@ -130,9 +130,50 @@ async function updateOrderStatus(req, res, next) {
     return next(err);
   }
 }
+
+async function editOrder(req, res, next) {
+  try {
+    const { id } = req.params;
+    const items = req.body?.items;
+    const reason = req.body?.reason;
+    const changedBy =
+      req.session?.userId ?? req.session?.user?.id ?? req.user?.id ?? null;
+
+    const result = await editOrderItems({
+      orderId: id,
+      items,
+      changedBy,
+      reason,
+    });
+
+    return res.status(200).json({
+      order: result.order,
+      items: result.items,
+      stockChanges: result.stockChanges,
+    });
+  } catch (err) {
+    if (err.statusCode) {
+      const payload = {
+        error: err.message,
+        code: err.code || "ORDER_EDIT_ERROR",
+      };
+
+      if (err.orderId !== undefined) payload.orderId = err.orderId;
+      if (err.currentStatus !== undefined)
+        payload.currentStatus = err.currentStatus;
+      if (err.itemId !== undefined) payload.itemId = err.itemId;
+      if (err.available !== undefined) payload.available = err.available;
+
+      return res.status(err.statusCode).json(payload);
+    }
+
+    return next(err);
+  }
+}
 module.exports = {
   punchOrder,
   getOrders,
   transitionOrderStatus,
   updateOrderStatus,
+  editOrder,
 };

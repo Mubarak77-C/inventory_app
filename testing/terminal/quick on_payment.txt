@@ -1,0 +1,175 @@
+026-11-23 18:08:57.98804+00
+  5 |       14 | PREPARING   | READY     |          3 | Plated and ready | 2026-11-23 18:21:57.504163+00
+  6 |       15 |             | PENDING   |          1 | Order punched    | 2026-11-23 18:22:43.150845+00
+  7 |       15 | PENDING     | PREPARING |          1 |                  | 2026-11-23 18:22:47.585723+00
+  8 |       15 | PREPARING   | READY     |          1 |                  | 2026-11-23 18:22:49.941798+00
+  9 |       15 | READY       | SERVED    |          1 |                  | 2026-11-23 18:22:52.695334+00
+(9 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, order_id, from_status, to_status, changed_by, reason, changed_at FROM public.order_status_history ORDER BY id ASC;"
+ id | order_id | from_status | to_status | changed_by |      reason      |          changed_at           
+----+----------+-------------+-----------+------------+------------------+-------------------------------
+  1 |       13 |             | PENDING   |          3 | Order punched    | 2026-11-23 18:07:03.171659+00
+  2 |       13 | PENDING     | PREPARING |            |                  | 2026-11-23 18:07:03.22494+00
+  3 |       14 |             | PENDING   |          1 | Order punched    | 2026-11-23 18:08:39.595564+00
+  4 |       14 | PENDING     | PREPARING |            |                  | 2026-11-23 18:08:57.98804+00
+  5 |       14 | PREPARING   | READY     |          3 | Plated and ready | 2026-11-23 18:21:57.504163+00
+  6 |       15 |             | PENDING   |          1 | Order punched    | 2026-11-23 18:22:43.150845+00
+  7 |       15 | PENDING     | PREPARING |          1 |                  | 2026-11-23 18:22:47.585723+00
+  8 |       15 | PREPARING   | READY     |          1 |                  | 2026-11-23 18:22:49.941798+00
+  9 |       15 | READY       | SERVED    |          1 |                  | 2026-11-23 18:22:52.695334+00
+(9 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 
+ *  History restored 
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-ap
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 
+ *  History restored 
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db \
+  < db/migrations/007_add_order_payments.sql
+ALTER TABLE
+NOTICE:  constraint "chk_orders_payment_method" of relation "orders" does not exist, skipping
+ALTER TABLE
+NOTICE:  constraint "chk_orders_payment_status" of relation "orders" does not exist, skipping
+ALTER TABLE
+NOTICE:  constraint "chk_orders_paid_consistency" of relation "orders" does not exist, skipping
+ALTER TABLE
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ # Rejecting COMPLETED with missing paymentMethod (400)
+curl -s -i -b /tmp/cookies.txt -X PATCH http://localhost:3000/orders/15/status \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"status":"COMPLETED"}'
+
+# Completing with paymentMethod=UPI (200)
+curl -s -i -b /tmp/cookies.txt -X PATCH http://localhost:3000/orders/15/status \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"status":"COMPLETED","paymentMethod":"UPI","paymentReference":"UPI-998877"}'
+
+# Inspect order payment columns in PostgreSQL
+docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders WHERE id = 15;"
+HTTP/1.1 401 Unauthorized
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 36
+ETag: W/"24-2ya6UNOy8AlxJkjNOyYmjYabP90"
+Date: Tue, 24 Nov 2026 08:23:38 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Authentication required."}HTTP/1.1 401 Unauthorized
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 36
+ETag: W/"24-2ya6UNOy8AlxJkjNOyYmjYabP90"
+Date: Tue, 24 Nov 2026 08:23:38 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Authentication required."} id |  status   | total_amount | payment_method | payment_status | payment_reference |            paid_at            
+----+-----------+--------------+----------------+----------------+-------------------+-------------------------------
+ 15 | COMPLETED |        15.00 | CARD           | PAID           |                   | 2026-11-24 08:22:17.048167+00
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders WHERE id = 15;"
+ id |  status   | total_amount | payment_method | payment_status | payment_reference |            paid_at            
+----+-----------+--------------+----------------+----------------+-------------------+-------------------------------
+ 15 | COMPLETED |        15.00 | CARD           | PAID           |                   | 2026-11-24 08:22:17.048167+00
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders
+> docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders WHERE id=*;"
+> ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders
+docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders WHERE id=*;"
+> ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders
+docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders WHERE id=3;"
+> ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders
+docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders WHERE id=3;"
+> ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, status, total_amount, payment_method, payment_status, payment_refer
+> ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^[[200~docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js~^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, status, total_amount, payment_method, payment_status, paid_at FROM public.orders ORDER BY id DESC LIMIT 3;"
+ id |  status   | total_amount | payment_method | payment_status |            paid_at            
+----+-----------+--------------+----------------+----------------+-------------------------------
+ 17 | COMPLETED |        45.99 |                | UNPAID         | 
+ 16 | CANCELLED |        15.00 |                | UNPAID         | 
+ 15 | COMPLETED |        15.00 | CARD           | PAID           | 2026-11-24 08:22:17.048167+00
+(3 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, status, total_amount, payment_method, payment_status, paid_at FROM public.orders ORDER BY id DESC LIMIT 15;"
+ id |  status   | total_amount | payment_method | payment_status |            paid_at            
+----+-----------+--------------+----------------+----------------+-------------------------------
+ 17 | COMPLETED |        45.99 |                | UNPAID         | 
+ 16 | CANCELLED |        15.00 |                | UNPAID         | 
+ 15 | COMPLETED |        15.00 | CARD           | PAID           | 2026-11-24 08:22:17.048167+00
+ 14 | COMPLETED |        45.00 | UPI            | PAID           | 2026-11-24 08:22:43.234206+00
+ 13 | COMPLETED |        45.99 | CASH           | PAID           | 2026-11-24 08:25:46.616129+00
+ 11 | COMPLETED |        10.00 | CARD           | PAID           | 2026-11-24 08:25:58.526479+00
+ 10 | READY     |        70.00 |                | UNPAID         | 
+  9 | CANCELLED |         5.00 |                | UNPAID         | 
+  8 | READY     |        14.00 |                | UNPAID         | 
+  7 | CANCELLED |        45.99 |                | UNPAID         | 
+  6 | READY     |       140.00 |                | UNPAID         | 
+  5 | COMPLETED |         2.00 | UPI            | PAID           | 2026-11-24 08:24:48.160692+00
+  4 | PENDING   |        72.00 |                | UNPAID         | 
+  3 | PREPARING |         2.12 |                | UNPAID         | 
+  2 | CANCELLED |        45.99 |                | UNPAID         | 
+(15 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, paid_at FROM public.orders ORDER BY id DESC LIMIT 15;"
+ id |  status   | total_amount | payment_method | payment_status |            paid_at            
+----+-----------+--------------+----------------+----------------+-------------------------------
+ 19 | COMPLETED |        15.00 | CARD           | PAID           | 2026-11-24 08:42:03.53+00
+ 18 | COMPLETED |        15.00 | CASH           | PAID           | 2026-11-24 08:41:49.029+00
+ 17 | COMPLETED |        45.99 |                | UNPAID         | 
+ 16 | CANCELLED |        15.00 |                | UNPAID         | 
+ 15 | COMPLETED |        15.00 | CARD           | PAID           | 2026-11-24 08:22:17.048167+00
+ 14 | COMPLETED |        45.00 | UPI            | PAID           | 2026-11-24 08:22:43.234206+00
+ 13 | COMPLETED |        45.99 | CASH           | PAID           | 2026-11-24 08:25:46.616129+00
+ 11 | COMPLETED |        10.00 | CARD           | PAID           | 2026-11-24 08:25:58.526479+00
+ 10 | READY     |        70.00 |                | UNPAID         | 
+  9 | CANCELLED |         5.00 |                | UNPAID         | 
+  8 | READY     |        14.00 |                | UNPAID         | 
+  7 | CANCELLED |        45.99 |                | UNPAID         | 
+  6 | READY     |       140.00 |                | UNPAID         | 
+  5 | COMPLETED |         2.00 | UPI            | PAID           | 2026-11-24 08:24:48.160692+00
+  4 | PENDING   |        72.00 |                | UNPAID         | 
+(15 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 

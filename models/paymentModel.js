@@ -1,5 +1,5 @@
 // models/paymentModel.js
-const pool = require("../config/db");
+const pool = require("../db/pool");
 const { createGatewayPaymentAttempt } = require("../services/paymentGateway");
 
 const ALLOWED_ATTEMPT_METHODS = new Set(["CASH", "CARD", "UPI"]);

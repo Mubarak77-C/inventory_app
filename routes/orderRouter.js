@@ -22,7 +22,7 @@ router.put(
 );
 router.post(
   "/:id/payment-intent",
-  requireAuth,
+
   requireRole("admin", "cashier"),
   orderController.createPaymentIntent,
 );

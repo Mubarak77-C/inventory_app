@@ -1,0 +1,641 @@
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -sf -c /tmp/cookies.txt -L -X POST http://localhost:3000/login \
+  -d "username=cashier1&password=Cashier@1234" > /dev/null
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ORDER_ID=$(curl -sf -b /tmp/cookies.txt -X POST http://localhost:3000/orders \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d "{\"idempotencyKey\":\"c1-ord-$(date +%s)\",\"items\":[{\"itemId\":3,\"quantity\":1}]}" \
+  | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(d.order?d.order.id:'')")
+echo "Order ID: $ORDER_ID"
+<anonymous_script>:1
+
+
+SyntaxError: Unexpected end of JSON input
+    at JSON.parse (<anonymous>)
+    at [eval]:1:14
+    at runScriptInThisContext (node:internal/vm:219:10)
+    at node:internal/process/execution:451:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:449:60)
+    at evalFunction (node:internal/process/execution:283:30)
+    at evalTypeScript (node:internal/process/execution:295:3)
+    at node:internal/main/eval_string:71:3
+
+Node.js v24.20.0
+Order ID: 
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -b /tmp/cookies.txt -X POST "http://localhost:3000/orders/${ORDER_ID}/payment-intent" \
+  -H "Content-Type: application/json" \
+  -d '{"paymentMethod":"CARD","currency":"INR","simulateOutcome":"DECLINE"}'
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -b /tmp/cookies.txt -X POST "http://localhost:3000/orders/${ORDER_ID}/payment-intent" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: pay-${ORDER_ID}-ok" \
+  -d '{"paymentMethod":"CARD","currency":"INR","simulateOutcome":"APPROVE"}'
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -b /tmp/cookies.txt -X POST http://localhost:3000/orders \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d "{\"idempotencyKey\":\"c1-ord-$(date +%s)\",\"items\":[{\"itemId\":3,\"quantity\":1}]}"
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ITEM_ID=3
+RAW_RESP=$(curl -s -w "\n%{http_code}" -b /tmp/cookies.txt -X POST http://localhost:3000/orders \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d "{\"idempotencyKey\":\"c1-ord-$(date +%s%N)\",\"items\":[{\"itemId\":${ITEM_ID},\"quantity\":1}]}")
+HTTP_CODE=$(printf "%s" "$RAW_RESP" | tail -n1)
+BODY=$(printf "%s" "$RAW_RESP" | sed '$d')
+echo "HTTP: $HTTP_CODE"
+echo "Body: $BODY"
+ORDER_ID=$(printf "%s" "$BODY" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(d.order?d.order.id:'')")
+echo "Order ID: $ORDER_ID"
+HTTP: 000
+Body: 
+<anonymous_script>:1
+
+
+SyntaxError: Unexpected end of JSON input
+    at JSON.parse (<anonymous>)
+    at [eval]:1:14
+    at runScriptInThisContext (node:internal/vm:219:10)
+    at node:internal/process/execution:451:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:449:60)
+    at evalFunction (node:internal/process/execution:283:30)
+    at evalTypeScript (node:internal/process/execution:295:3)
+    at node:internal/main/eval_string:71:3
+
+Node.js v24.20.0
+Order ID: 
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose ps
+NAME                 IMAGE                    COMMAND                  SERVICE    CREATED      STATUS                 PORTS
+inventory_node_app   inventory-app-app        "docker-entrypoint.s…"   app        5 days ago   Up 17 minutes          0.0.0.0:3000->3000/tcp, :::3000->3000/tcp
+inventory_postgres   pgvector/pgvector:pg15   "docker-entrypoint.s…"   postgres   6 days ago   Up 3 hours (healthy)   5432/tcp
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose logs --tail=80 app
+inventory_node_app  | 
+inventory_node_app  | Node.js v18.20.8
+inventory_node_app  | [nodemon] app crashed - waiting for file changes before starting...
+inventory_node_app  | [nodemon] restarting due to changes...
+inventory_node_app  | [nodemon] starting `node app.js`
+inventory_node_app  | ◇ injected env (2) from .env
+inventory_node_app  | ◇ injected env (0) from .env
+inventory_node_app  | node:internal/modules/cjs/loader:1143
+inventory_node_app  |   throw err;
+inventory_node_app  |   ^
+inventory_node_app  | 
+inventory_node_app  | Error: Cannot find module '../config/db'
+inventory_node_app  | Require stack:
+inventory_node_app  | - /app/models/paymentModel.js
+inventory_node_app  | - /app/controllers/orderController.js
+inventory_node_app  | - /app/routes/orderRouter.js
+inventory_node_app  | - /app/app.js
+inventory_node_app  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1140:15)
+inventory_node_app  |     at Module._load (node:internal/modules/cjs/loader:981:27)
+inventory_node_app  |     at Module.require (node:internal/modules/cjs/loader:1231:19)
+inventory_node_app  |     at require (node:internal/modules/helpers:177:18)
+inventory_node_app  |     at Object.<anonymous> (/app/models/paymentModel.js:2:14)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  |     at Module.load (node:internal/modules/cjs/loader:1203:32)
+inventory_node_app  |     at Module._load (node:internal/modules/cjs/loader:1019:12)
+inventory_node_app  |     at Module.require (node:internal/modules/cjs/loader:1231:19) {
+inventory_node_app  |   code: 'MODULE_NOT_FOUND',
+inventory_node_app  |   requireStack: [
+inventory_node_app  |     '/app/models/paymentModel.js',
+inventory_node_app  |     '/app/controllers/orderController.js',
+inventory_node_app  |     '/app/routes/orderRouter.js',
+inventory_node_app  |     '/app/app.js'
+inventory_node_app  |   ]
+inventory_node_app  | }
+inventory_node_app  | 
+inventory_node_app  | Node.js v18.20.8
+inventory_node_app  | [nodemon] app crashed - waiting for file changes before starting...
+inventory_node_app  | 
+inventory_node_app  | > inventory-app@1.0.0 dev
+inventory_node_app  | > nodemon app.js
+inventory_node_app  | 
+inventory_node_app  | [nodemon] 3.1.14
+inventory_node_app  | [nodemon] to restart at any time, enter `rs`
+inventory_node_app  | [nodemon] watching path(s): *.*
+inventory_node_app  | [nodemon] watching extensions: js,mjs,cjs,json
+inventory_node_app  | [nodemon] starting `node app.js`
+inventory_node_app  | ◇ injected env (2) from .env
+inventory_node_app  | ◇ injected env (0) from .env
+inventory_node_app  | node:internal/modules/cjs/loader:1143
+inventory_node_app  |   throw err;
+inventory_node_app  |   ^
+inventory_node_app  | 
+inventory_node_app  | Error: Cannot find module '../config/db'
+inventory_node_app  | Require stack:
+inventory_node_app  | - /app/models/paymentModel.js
+inventory_node_app  | - /app/controllers/orderController.js
+inventory_node_app  | - /app/routes/orderRouter.js
+inventory_node_app  | - /app/app.js
+inventory_node_app  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1140:15)
+inventory_node_app  |     at Module._load (node:internal/modules/cjs/loader:981:27)
+inventory_node_app  |     at Module.require (node:internal/modules/cjs/loader:1231:19)
+inventory_node_app  |     at require (node:internal/modules/helpers:177:18)
+inventory_node_app  |     at Object.<anonymous> (/app/models/paymentModel.js:2:14)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  |     at Module.load (node:internal/modules/cjs/loader:1203:32)
+inventory_node_app  |     at Module._load (node:internal/modules/cjs/loader:1019:12)
+inventory_node_app  |     at Module.require (node:internal/modules/cjs/loader:1231:19) {
+inventory_node_app  |   code: 'MODULE_NOT_FOUND',
+inventory_node_app  |   requireStack: [
+inventory_node_app  |     '/app/models/paymentModel.js',
+inventory_node_app  |     '/app/controllers/orderController.js',
+inventory_node_app  |     '/app/routes/orderRouter.js',
+inventory_node_app  |     '/app/app.js'
+inventory_node_app  |   ]
+inventory_node_app  | }
+inventory_node_app  | 
+inventory_node_app  | Node.js v18.20.8
+inventory_node_app  | [nodemon] app crashed - waiting for file changes before starting...
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ grep -rn "pool" models/
+models/paymentModel.js:2:const pool = require("../config/db");
+models/paymentModel.js:49:  const client = await pool.connect();
+models/paymentModel.js:179:  const client = await pool.connect();
+models/categoryModel.js:2:const pool = require("../db/pool");
+models/categoryModel.js:5:  const { rows } = await pool.query("SELECT * FROM categories");
+models/categoryModel.js:16:  const { rows } = await pool.query(query, values);
+models/categoryModel.js:20:  const { rows } = await pool.query("SELECT * FROM categories WHERE id = $1", [
+models/categoryModel.js:29:  const { rows } = await pool.query(query, [id]);
+models/itemModel.js:2:const pool = require("../db/pool");
+models/itemModel.js:21:  const { rows } = await pool.query(query, params);
+models/itemModel.js:48:  const { rows } = await pool.query(query, values);
+models/itemModel.js:60:  const { rows } = await pool.query(query, [categoryId]);
+models/itemModel.js:91:  const { rows } = await pool.query(query, values);
+models/itemModel.js:103:  const { rows } = await pool.query(query, [id]);
+models/itemModel.js:109:  const { rows } = await pool.query(query, [id]);
+models/itemModel.js:133:  const { rows } = await pool.query(query, params);
+models/itemModel.js:147:  const { rows } = await pool.query(query, params);
+models/itemModel.js:158:  await pool.query(query, [
+models/itemModel.js:171:  const { rows } = await pool.query(query, [limit]);
+models/itemModel.js:177:  await pool.query(query);
+models/itemModel.js:202:  const { rows } = await pool.query(
+models/itemModel.js:257:  const { rows } = await pool.query(
+models/itemModel.js:298:  const { rows } = await pool.query(
+models/itemModel.js:307:  const { rows } = await pool.query(
+models/itemModel.js:330:  const { rows } = await pool.query(`
+models/itemModel.js:346:  const { rows } = await pool.query(
+models/orderModel.js:2:const pool = require("../db/pool");
+models/orderModel.js:177:  const client = await pool.connect();
+models/orderModel.js:324:        pool,
+models/orderModel.js:344:  const { rows } = await pool.query(
+models/orderModel.js:447:  const client = await pool.connect();
+models/orderModel.js:605:  const client = await pool.connect();
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/paymentModel.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose logs --tail=30 app
+inventory_node_app  |   throw err;
+inventory_node_app  |   ^
+inventory_node_app  | 
+inventory_node_app  | Error: Cannot find module '../config/db'
+inventory_node_app  | Require stack:
+inventory_node_app  | - /app/models/paymentModel.js
+inventory_node_app  | - /app/controllers/orderController.js
+inventory_node_app  | - /app/routes/orderRouter.js
+inventory_node_app  | - /app/app.js
+inventory_node_app  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1140:15)
+inventory_node_app  |     at Module._load (node:internal/modules/cjs/loader:981:27)
+inventory_node_app  |     at Module.require (node:internal/modules/cjs/loader:1231:19)
+inventory_node_app  |     at require (node:internal/modules/helpers:177:18)
+inventory_node_app  |     at Object.<anonymous> (/app/models/paymentModel.js:2:14)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  |     at Module.load (node:internal/modules/cjs/loader:1203:32)
+inventory_node_app  |     at Module._load (node:internal/modules/cjs/loader:1019:12)
+inventory_node_app  |     at Module.require (node:internal/modules/cjs/loader:1231:19) {
+inventory_node_app  |   code: 'MODULE_NOT_FOUND',
+inventory_node_app  |   requireStack: [
+inventory_node_app  |     '/app/models/paymentModel.js',
+inventory_node_app  |     '/app/controllers/orderController.js',
+inventory_node_app  |     '/app/routes/orderRouter.js',
+inventory_node_app  |     '/app/app.js'
+inventory_node_app  |   ]
+inventory_node_app  | }
+inventory_node_app  | 
+inventory_node_app  | Node.js v18.20.8
+inventory_node_app  | [nodemon] app crashed - waiting for file changes before starting...
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/paymentModel.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose logs --tail=30 app
+inventory_node_app  |     '/app/controllers/orderController.js',
+inventory_node_app  |     '/app/routes/orderRouter.js',
+inventory_node_app  |     '/app/app.js'
+inventory_node_app  |   ]
+inventory_node_app  | }
+inventory_node_app  | 
+inventory_node_app  | Node.js v18.20.8
+inventory_node_app  | [nodemon] app crashed - waiting for file changes before starting...
+inventory_node_app  | [nodemon] restarting due to changes...
+inventory_node_app  | [nodemon] starting `node app.js`
+inventory_node_app  | ◇ injected env (2) from .env
+inventory_node_app  | ◇ injected env (0) from .env
+inventory_node_app  | /app/routes/orderRouter.js:25
+inventory_node_app  |   requireAuth,
+inventory_node_app  |   ^
+inventory_node_app  | 
+inventory_node_app  | ReferenceError: requireAuth is not defined
+inventory_node_app  |     at Object.<anonymous> (/app/routes/orderRouter.js:25:3)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  |     at Module.load (node:internal/modules/cjs/loader:1203:32)
+inventory_node_app  |     at Module._load (node:internal/modules/cjs/loader:1019:12)
+inventory_node_app  |     at Module.require (node:internal/modules/cjs/loader:1231:19)
+inventory_node_app  |     at require (node:internal/modules/helpers:177:18)
+inventory_node_app  |     at Object.<anonymous> (/app/app.js:18:21)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  | 
+inventory_node_app  | Node.js v18.20.8
+inventory_node_app  | [nodemon] app crashed - waiting for file changes before starting...
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose logs --tail=20 app
+inventory_node_app  | 
+inventory_node_app  | ReferenceError: requireAuth is not defined
+inventory_node_app  |     at Object.<anonymous> (/app/routes/orderRouter.js:25:3)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  |     at Module.load (node:internal/modules/cjs/loader:1203:32)
+inventory_node_app  |     at Module._load (node:internal/modules/cjs/loader:1019:12)
+inventory_node_app  |     at Module.require (node:internal/modules/cjs/loader:1231:19)
+inventory_node_app  |     at require (node:internal/modules/helpers:177:18)
+inventory_node_app  |     at Object.<anonymous> (/app/app.js:18:21)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  | 
+inventory_node_app  | Node.js v18.20.8
+inventory_node_app  | [nodemon] app crashed - waiting for file changes before starting...
+inventory_node_app  | [nodemon] restarting due to changes...
+inventory_node_app  | [nodemon] starting `node app.js`
+inventory_node_app  | ◇ injected env (2) from .env
+inventory_node_app  | ◇ injected env (0) from .env
+inventory_node_app  | Inventory app listening on http://localhost:3000
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose logs --tail=20 app
+inventory_node_app  |     at Module.load (node:internal/modules/cjs/loader:1203:32)
+inventory_node_app  |     at Module._load (node:internal/modules/cjs/loader:1019:12)
+inventory_node_app  |     at Module.require (node:internal/modules/cjs/loader:1231:19)
+inventory_node_app  |     at require (node:internal/modules/helpers:177:18)
+inventory_node_app  |     at Object.<anonymous> (/app/app.js:18:21)
+inventory_node_app  |     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+inventory_node_app  |     at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+inventory_node_app  | 
+inventory_node_app  | Node.js v18.20.8
+inventory_node_app  | [nodemon] app crashed - waiting for file changes before starting...
+inventory_node_app  | [nodemon] restarting due to changes...
+inventory_node_app  | [nodemon] starting `node app.js`
+inventory_node_app  | ◇ injected env (2) from .env
+inventory_node_app  | ◇ injected env (0) from .env
+inventory_node_app  | Inventory app listening on http://localhost:3000
+inventory_node_app  | [nodemon] restarting due to changes...
+inventory_node_app  | [nodemon] starting `node app.js`
+inventory_node_app  | ◇ injected env (2) from .env
+inventory_node_app  | ◇ injected env (0) from .env
+inventory_node_app  | Inventory app listening on http://localhost:3000
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i http://localhost:3000/login
+HTTP/1.1 200 OK
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: text/html; charset=utf-8
+Content-Length: 1321
+ETag: W/"529-XcXXLTdbYJylTOFuw7Ips+gicSE"
+Date: Tue, 24 Nov 2026 17:40:05 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Login</title>
+  <script src="https://tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-xl">
+    <h1 class="text-2xl font-bold mb-2">Admin Sign In</h1>
+    <p class="text-slate-400 text-sm mb-6">Sign in to manage inventory items and categories.</p>
+
+    
+
+    <form action="/login" method="POST" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1">Username</label>
+        <input type="text" name="username" required class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1">Password</label>
+        <input type="password" name="password" required class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500" />
+      </div>
+      <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 font-semibold rounded-lg transition">
+        Sign In
+      </button>
+    </form>
+  </div>
+</body>
+</html>
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ sed -n '1,35p' routes/orderRouter.js
+// routes/orderRouter.js
+const { Router } = require("express");
+const orderController = require("../controllers/orderController");
+const { requireRole } = require("../middleware/authMiddleware");
+
+const router = Router();
+
+// Punch / create an order (cashier, admin, and superadmin via requireRole)
+router.get("/", requireRole("admin", "cashier"), orderController.getOrders);
+router.post("/", requireRole("admin", "cashier"), orderController.punchOrder);
+
+router.patch(
+  "/:id/status",
+  requireRole("admin", "cashier"),
+  orderController.updateOrderStatus,
+);
+
+router.put(
+  "/:id/items",
+  requireRole("admin", "cashier"),
+  orderController.editOrder,
+);
+router.post(
+  "/:id/payment-intent",
+
+  requireRole("admin", "cashier"),
+  orderController.createPaymentIntent,
+);
+module.exports = router;
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -sf -c /tmp/cookies.txt -L -X POST http://localhost:3000/login -d "username=cashier1&password=Cashier@1234" > /dev/null
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db -c "SELECT id, name, stock_quantity, price FROM public.items ORDER BY id LIMIT 10;"
+ERROR:  column "stock_quantity" does not exist
+LINE 1: SELECT id, name, stock_quantity, price FROM public.items ORD...
+                         ^
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ RAW=$(curl -s -w "\n%{http_code}" -b /tmp/cookies.txt -X POST http://localhost:3000/orders \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"idempotencyKey":"c1-ord-test-1","items":[{"itemId":3,"quantity":1}]}')
+ORDER_ID=$(printf "%s" "$RAW" | sed '$d' | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(d.order?d.order.id:'')")
+echo "ORDER_ID=$ORDER_ID"
+ORDER_ID=28
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -b /tmp/cookies.txt -X POST "http://localhost:3000/orders/${ORDER_ID}/payment-intent" \
+  -H "Content-Type: application/json" \
+  -d '{"paymentMethod":"CARD","currency":"INR","simulateOutcome":"DECLINE"}'
+HTTP/1.1 201 Created
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 546
+ETag: W/"222-nTFnz5aa1Ujqy+kkz1F4t9XZPi8"
+Date: Tue, 24 Nov 2026 17:45:05 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"replayed":false,"order":{"id":28,"status":"PENDING","total_amount":"15.00","payment_status":"UNPAID"},"paymentAttempt":{"id":"1","order_id":"28","idempotency_key":"order-28-attempt-1","provider":"local_test_gateway","provider_payment_id":"pi_test_d8ba716a779a91711838","payment_method":"CARD","amount":"15.00","currency":"INR","status":"FAILED","failure_code":"card_declined","failure_message":"Simulated test card decline (insufficient funds or issuer decline)","created_at":"2026-ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -b /tmp/cookies.txt -X POST "http://localhost:3000/orders/${ORDER_ID}/payment-intent" \ST "http://localhost:3000/orders/${ORDER_ID}/payment-intent" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: pay-${ORDER_ID}-ok" \
+  -d '{"paymentMethod":"CARD","currency":"INR","simulateOutcome":"APPROVE"}'
+HTTP/1.1 201 Created
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 465
+ETag: W/"1d1-ldI0D50JEMOtVSyRznbodZCDQhs"
+Date: Tue, 24 Nov 2026 17:45:52 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"replayed":false,"order":{"id":28,"status":"PENDING","total_amount":"15.00","payment_status":"UNPAID"},"paymentAttempt":{"id":"2","order_id":"28","idempotency_key":"pay-28-ok","provider":"local_test_gateway","provider_payment_id":"pi_test_192d0cc947f3856b3620","payment_method":"CARD","amount":"15.00","currency":"INR","status":"SUCCEEDED","failure_code":null,"failure_message":null,"created_at":"2026-11-24T17:45:52.614Z","updated_at":"2026-11-24T17:45:52.620Z"}}ubuntu@ubuntu-HP-Laubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -b /tmp/cookies.txt -X POST "http://localhost:3000/orders/${ORDER_ID}/payment-intent" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: pay-${ORDER_ID}-ok" \
+  -d '{"paymentMethod":"CARD","currency":"INR","simulateOutcome":"APPROVE"}'
+HTTP/1.1 200 OK
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 464
+ETag: W/"1d0-OoodUaAICa/RMMOvjDrFsInU2DI"
+Date: Tue, 24 Nov 2026 17:46:16 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"replayed":true,"order":{"id":28,"status":"PENDING","total_amount":"15.00","payment_status":"UNPAID"},"paymentAttempt":{"id":"2","order_id":"28","idempotency_key":"pay-28-ok","provider":"local_test_gateway","provider_payment_id":"pi_test_192d0cc947f3856b3620","payment_method":"CARD","amount":"15.00","currency":"INR","status":"SUCCEEDED","failure_code":null,"failure_message":null,"created_at":"2026-11-24T17:45:52.614Z","updated_at":"2026-11-24T17:45:52.620Z"}}ubuntu@ubuntu-HP-Lapubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db -c "SELECT id, order_id, idempotency_key, provider_payment_id, status, failure_code FROM public.payment_attempts WHERE order_id = ${ORDER_ID} ORDER BY id;"
+ id | order_id |  idempotency_key   |     provider_payment_id      |  status   | failure_code  
+----+----------+--------------------+------------------------------+-----------+---------------
+  1 |       28 | order-28-attempt-1 | pi_test_d8ba716a779a91711838 | FAILED    | card_declined
+  2 |       28 | pay-28-ok          | pi_test_192d0cc947f3856b3620 | SUCCEEDED | 
+(2 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^[[200~cat middleware/authMiddleware.~
+cat: command not found
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ cat middleware/authMiddleware.
+cat: middleware/authMiddleware.: No such file or directory
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ cat middleware/authMiddleware.js
+function wantsJson(req) {
+  return Boolean(req.xhr || req.headers.accept?.includes("application/json"));
+}
+
+function requireRole(...allowedRoles) {
+  return (req, res, next) => {
+    // 1. Not logged in -> 401 JSON or redirect to /login
+    if (!req.session || !req.session.userId) {
+      if (wantsJson(req)) {
+        return res.status(401).json({ error: "Authentication required." });
+      }
+      return res.redirect("/login");
+    }
+
+    // 2. Superadmin gets full bypass across role-protected routes
+    if (req.session.role === "superadmin") {
+      return next();
+    }
+
+    // 3. Logged in, but role is not in allowedRoles -> 403 Forbidden
+    if (!allowedRoles.includes(req.session.role)) {
+      const message = `Access denied. Requires role: ${allowedRoles.join(" or ")}.`;
+      if (wantsJson(req)) {
+        return res.status(403).json({ error: message });
+      }
+      return res.status(403).render("403", { message });
+    }
+    return next();
+  };
+}
+
+// Keep requireAdmin as a shortcut for admin-only routes (superadmin also passes via requireRole)
+const requireAdmin = requireRole("admin");
+
+function attachUserToLocals(req, res, next) {
+  res.locals.currentUser = req.session?.userId
+    ? {
+        id: req.session.userId,
+        username: req.session.username,
+        role: req.session.role,
+      }
+    : null;
+  next();
+}
+
+module.exports = { requireRole, requireAdmin, attachUserToLocals };
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -X POST http://localhost:3000/orders/28/payment-intent -H "Content-Type: application/json" -d '{"paymentMethod":"CARD"}'
+HTTP/1.1 302 Found
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Location: /login
+Vary: Accept
+Content-Type: text/plain; charset=utf-8
+Content-Length: 28
+Date: Tue, 24 Nov 2026 17:54:03 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+Found. Redirecting to /loginubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^[[200~docker-compose exec -T postgres psql -U my_user -d inventory_db -c "\d public.items"~^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db -c "\d public.items"
+                                         Table "public.items"
+   Column    |            Type             | Collation | Nullable |              Default              
+-------------+-----------------------------+-----------+----------+-----------------------------------
+ id          | integer                     |           | not null | nextval('items_id_seq'::regclass)
+ name        | character varying(100)      |           | not null | 
+ description | text                        |           |          | 
+ category_id | integer                     |           |          | 
+ price       | numeric(10,2)               |           | not null | 
+ stock_count | integer                     |           | not null | 0
+ created_at  | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ embedding   | vector(768)                 |           |          | 
+Indexes:
+    "items_pkey" PRIMARY KEY, btree (id)
+    "items_embedding_hnsw_idx" hnsw (embedding vector_cosine_ops)
+Foreign-key constraints:
+    "items_category_id_fkey" FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+Referenced by:
+    TABLE "order_items" CONSTRAINT "order_items_item_id_fkey" FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -X POST http://localhost:3000/orders/28/payment-intent -H "Accept: application/json" -H "Content-Type: application/json" -d '{"paymentMethod":"CARD"}'
+HTTP/1.1 401 Unauthorized
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 36
+ETag: W/"24-2ya6UNOy8AlxJkjNOyYmjYabP90"
+Date: Tue, 24 Nov 2026 17:59:22 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Authentication required."}ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ dockerdocker-compose exec -T postgres psql -U my_user -d inventory_db -c "SELECT id, name, stock_count, price FROM public.items ORDER BY id LIMIT 10;"
+ id |            name             | stock_count | price  
+----+-----------------------------+-------------+--------
+  1 | Chef Knife                  |           8 |  45.99
+  2 | Blender                     |           3 | 120.50
+  3 | Cocktail Shaker             |          17 |  15.00
+  4 | Pepsi cold drink            |           0 |   2.12
+  5 | Cold Brew Coffee Keg        |           9 |  45.00
+  6 | Flavored Iced Tea:          |          21 |   2.00
+  7 | Mint Cooler                 |           5 |   5.00
+  8 | Signature & Craft Cocktails |          24 |  70.00
+  9 | Brownies                    |           0 |   2.00
+ 10 | cheesecakes                 |           6 |   5.00
+(10 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db -c "SELECT id, order_id, status, payment_status, total_amount FROM public.orders WHERE id = 28;
+> ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db -c "SELECT id, order_id, status, payment_status, total_amount FROM public.orders WHERE id = 28
+> ^C^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db -c "SELECT id, username, role FROM public.users ORDER BY id;"
+ id |  username  |    role    
+----+------------+------------
+  1 | admin      | admin
+  3 | cashier1   | cashier
+  5 | superadmin | superadmin
+(3 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db -c "SELECT id, status, total_amount, payment_status, payment_method FROM public.orders WHERE id = 28;".
+ERROR:  syntax error at or near "."
+LINE 1: ...nt_status, payment_method FROM public.orders WHERE id = 28;.
+                                                                      ^
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db -c "SELECT id, status, total_amount, payment_status, payment_method FROM public.orders WHERE id = 28;"
+ id | status  | total_amount | payment_status | payment_method 
+----+---------+--------------+----------------+----------------
+ 28 | PENDING |        15.00 | UNPAID         | 
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node -e "console.log(process.env.NODE_ENV)"
+undefined
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node -e "console.log(Boolean(process.env.STRIPE_WEBHOOK_SECRET))"
+false
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ cat <<'EOF' >> .env
+NODE_ENV=development
+STRIPE_WEBHOOK_SECRET=whsec_test_local_secret
+EOF
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ grep -E "^(NODE_ENV|STRIPE_WEBHOOK_SECRET)=" .env
+NODE_ENV=development
+STRIPE_WEBHOOK_SECRET=whsec_test_local_secret
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^[[200~docker-compose exec app node --check app.js~
+docker-compose: command not found
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check app.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose restart app
+[+] Restarting 1/1
+ ✔ Container inventory_node_app  Started                                                                            0.6s 
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose logs --tail=15 app
+inventory_node_app  | ◇ injected env (4) from .env
+inventory_node_app  | ◇ injected env (0) from .env
+inventory_node_app  | Inventory app listening on http://localhost:3000
+inventory_node_app  | 
+inventory_node_app  | > inventory-app@1.0.0 dev
+inventory_node_app  | > nodemon app.js
+inventory_node_app  | 
+inventory_node_app  | [nodemon] 3.1.14
+inventory_node_app  | [nodemon] to restart at any time, enter `rs`
+inventory_node_app  | [nodemon] watching path(s): *.*
+inventory_node_app  | [nodemon] watching extensions: js,mjs,cjs,json
+inventory_node_app  | [nodemon] starting `node app.js`
+inventory_node_app  | ◇ injected env (4) from .env
+inventory_node_app  | ◇ injected env (0) from .env
+inventory_node_app  | Inventory app listening on http://localhost:3000
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 

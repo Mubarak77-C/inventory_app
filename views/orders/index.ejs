@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>POS Orders — Punch, Track &amp; Manage</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 1120px; margin: 2rem auto; padding: 0 1rem; color: #1f2937; }
+    body { font-family: system-ui, sans-serif; max-width: 1160px; margin: 2rem auto; padding: 0 1rem; color: #1f2937; }
     .card { border: 1px solid #d1d5db; border-radius: 8px; padding: 1.1rem 1.3rem; margin-bottom: 1.5rem; background: #fff; }
     .row { display: flex; gap: 0.65rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.75rem; }
     select, input, button { padding: 0.45rem 0.7rem; font-size: 0.92rem; border-radius: 6px; border: 1px solid #9ca3af; }
@@ -14,6 +14,8 @@
     button:disabled { opacity: 0.45; cursor: not-allowed; }
     .btn-primary { background: #111827; color: #fff; border-color: #111827; }
     .btn-primary:hover:not(:disabled) { background: #374151; }
+    .btn-edit { background: #eff6ff; color: #1e40af; border-color: #93c5fd; }
+    .btn-edit:hover:not(:disabled) { background: #dbeafe; }
     .btn-cancel { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
     .btn-cancel:hover:not(:disabled) { background: #fee2e2; }
     table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.92rem; }
@@ -30,6 +32,7 @@
     .msg-err { color: #991b1b; background: #fee2e2; border: 1px solid #fca5a5; padding: 0.65rem 0.85rem; border-radius: 6px; }
     .actions-cell { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
     .pay-meta { display: block; font-size: 0.76rem; color: #166534; margin-top: 0.2rem; font-weight: 600; }
+    #edit-order-panel { display: none; border-color: #93c5fd; background: #f8fafc; }
   </style>
 </head>
 <body>
@@ -67,20 +70,44 @@
       <div class="row" style="justify-content: space-between; margin-top: 0.9rem;">
         <div class="row" style="margin-bottom: 0;">
           <button type="button" id="add-row">+ Add Line Item</button>
-          <button type="submit" class="btn-primary">Punch Order</button>
+          <button type="submit" id="punch-order-btn" class="btn-primary">Punch Order</button>
           <select id="quick-payment-method" aria-label="Quick payment method">
-      <option value="CASH">CASH</option>
-      <option value="CARD">CARD</option>
-      <option value="UPI">UPI</option>
-    </select>
-    <button type="button" id="quick-pay-btn" class="btn-primary">Quick Payment</button>
-  </div>
-  <div>
-    Estimated Subtotal: <strong id="estimated-total">$0.00</strong>
-  </div>
+            <option value="CASH">CASH</option>
+            <option value="CARD">CARD</option>
+            <option value="UPI">UPI</option>
+          </select>
+          <button type="button" id="quick-pay-btn" class="btn-primary">Quick Payment</button>
+        </div>
+        <div>
+          Estimated Subtotal: <strong id="estimated-total">$0.00</strong>
+        </div>
       </div>
     </form>
     <div id="feedback" style="margin-top: 0.75rem;"></div>
+  </section>
+
+  <section id="edit-order-panel" class="card">
+    <h2>Edit Active Order <span id="edit-order-title"></span></h2>
+    <form id="edit-order-form">
+      <input type="hidden" id="edit-order-id" value="" />
+      <div id="edit-line-items"></div>
+      <div class="row" style="margin-top: 0.6rem;">
+        <label style="flex: 1; min-width: 220px;">
+          Reason (optional):
+          <input type="text" id="edit-reason" placeholder="e.g., Added extra drink or fixed quantity" style="width: 100%; max-width: 420px;" />
+        </label>
+      </div>
+      <div class="row" style="justify-content: space-between; margin-top: 0.75rem;">
+        <div class="row" style="margin-bottom: 0;">
+          <button type="button" id="edit-add-row">+ Add Item</button>
+          <button type="submit" class="btn-primary">Save Order Changes</button>
+          <button type="button" id="cancel-edit-btn">Cancel Edit</button>
+        </div>
+        <div>
+          Updated Subtotal: <strong id="edit-estimated-total">$0.00</strong>
+        </div>
+      </div>
+    </form>
   </section>
 
   <section class="card">
@@ -111,6 +138,7 @@
             };
             const nextStatus = nextMap[st] || null;
             const canCancel = st === "PENDING" || st === "PREPARING" || st === "READY";
+            const canEdit = st === "PENDING" || st === "PREPARING" || st === "READY" || st === "SERVED";
           %>
             <tr>
               <td><strong>#<%= order.id %></strong></td>
@@ -133,6 +161,15 @@
                 </time>
               </td>
               <td class="actions-cell">
+                <% if (canEdit) { %>
+                  <button
+                    type="button"
+                    class="btn-edit edit-order-btn"
+                    data-order-id="<%= order.id %>"
+                  >
+                    Edit
+                  </button>
+                <% } %>
                 <% if (st === "SERVED") { %>
                   <select class="payment-method-select" data-order-id="<%= order.id %>" aria-label="Payment method">
                     <option value="CASH">CASH</option>
@@ -167,7 +204,7 @@
                     Cancel &amp; Restock
                   </button>
                 <% } %>
-                <% if (!nextStatus && !canCancel) { %>
+                <% if (!canEdit && !nextStatus && !canCancel) { %>
                   <span style="color: #6b7280;">—</span>
                 <% } %>
               </td>
@@ -178,14 +215,34 @@
     </table>
   </section>
 
+ <script id="pos-orders-data" type="application/json"><%- JSON.stringify({
+    orders: orders || [],
+    catalogItems: catalogItems || []
+  }).replace(/</g, "\\u003c") %></script>
+
   <script>
+    const rawPosDataEl = document.getElementById("pos-orders-data");
+    const posPageData = rawPosDataEl ? JSON.parse(rawPosDataEl.textContent || "{}") : {};
+    const ORDERS_DATA = Array.isArray(posPageData.orders) ? posPageData.orders : [];
+    const CATALOG_DATA = Array.isArray(posPageData.catalogItems) ? posPageData.catalogItems : [];
+
     const lineItemsContainer = document.getElementById("line-items");
     const addRowBtn = document.getElementById("add-row");
     const form = document.getElementById("punch-order-form");
-    const feedback = document.getElementById("feedback");
-    const estimatedTotalEl = document.getElementById("estimated-total");
     const quickPayBtn = document.getElementById("quick-pay-btn");
     const quickPaySelect = document.getElementById("quick-payment-method");
+    const feedback = document.getElementById("feedback");
+    const estimatedTotalEl = document.getElementById("estimated-total");
+
+    const editPanel = document.getElementById("edit-order-panel");
+    const editTitle = document.getElementById("edit-order-title");
+    const editOrderIdInput = document.getElementById("edit-order-id");
+    const editForm = document.getElementById("edit-order-form");
+    const editLineItemsContainer = document.getElementById("edit-line-items");
+    const editAddRowBtn = document.getElementById("edit-add-row");
+    const cancelEditBtn = document.getElementById("cancel-edit-btn");
+    const editEstimatedTotalEl = document.getElementById("edit-estimated-total");
+    const editReasonInput = document.getElementById("edit-reason");
 
     function createKey() {
       if (window.crypto && typeof window.crypto.randomUUID === "function") {
@@ -250,14 +307,22 @@
       }
     });
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
+    async function submitOrder(targetStatus, paymentMethod = null) {
       feedback.innerHTML = "";
 
       const items = Array.from(lineItemsContainer.querySelectorAll(".line-item")).map((row) => ({
         itemId: Number(row.querySelector(".item-select").value),
         quantity: Number(row.querySelector(".qty-input").value),
       }));
+
+      const bodyPayload = {
+        idempotencyKey: currentIdempotencyKey,
+        items,
+        status: targetStatus,
+      };
+      if (paymentMethod) {
+        bodyPayload.paymentMethod = paymentMethod;
+      }
 
       try {
         const res = await fetch("/orders", {
@@ -267,7 +332,7 @@
             "Accept": "application/json",
             "Idempotency-Key": currentIdempotencyKey,
           },
-          body: JSON.stringify({ idempotencyKey: currentIdempotencyKey, items }),
+          body: JSON.stringify(bodyPayload),
         });
 
         const data = await res.json();
@@ -278,7 +343,11 @@
         }
 
         currentIdempotencyKey = createKey();
-        feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} created (${data.order.status}) — Total: $${Number(data.order.total_amount).toFixed(2)}</div>`;
+        const paidTag =
+          data.order.payment_status === "PAID"
+            ? ` · PAID (${data.order.payment_method})`
+            : "";
+        feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} created (${data.order.status}${paidTag}) — Total: $${Number(data.order.total_amount).toFixed(2)}</div>`;
         form.reset();
         recalcSubtotal();
         setTimeout(() => {
@@ -286,6 +355,148 @@
         }, 350);
       } catch (err) {
         feedback.innerHTML = `<div class="msg-err">Network error while punching order.</div>`;
+      }
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      await submitOrder("PENDING", null);
+    });
+
+    quickPayBtn.addEventListener("click", async () => {
+      if (!form.reportValidity()) return;
+      await submitOrder("COMPLETED", quickPaySelect.value);
+    });
+
+    // --- Edit Order Panel Logic ---
+    function buildEditRow(selectedItemId = "", qty = 1) {
+      const div = document.createElement("div");
+      div.className = "row edit-line-item";
+
+      const options = [`<option value="" data-price="0">-- Select an item --</option>`];
+      for (const cat of CATALOG_DATA) {
+        const sel = Number(cat.id) === Number(selectedItemId) ? "selected" : "";
+        options.push(
+          `<option value="${cat.id}" data-price="${Number(cat.price)}" ${sel}>#${cat.id} — ${cat.name} ($${Number(cat.price).toFixed(2)} | Stock: ${cat.stock_count})</option>`
+        );
+      }
+
+      div.innerHTML = `
+        <label>
+          Item:
+          <select class="edit-item-select" required>${options.join("")}</select>
+        </label>
+        <label>
+          Qty:
+          <input type="number" class="edit-qty-input" min="1" value="${Number(qty) || 1}" required style="width: 78px;" />
+        </label>
+        <span class="edit-line-preview" style="min-width: 90px; font-weight: 600;">$0.00</span>
+        <button type="button" class="edit-remove-row">Remove</button>
+      `;
+      return div;
+    }
+
+    function recalcEditSubtotal() {
+      let total = 0;
+      editLineItemsContainer.querySelectorAll(".edit-line-item").forEach((row) => {
+        const select = row.querySelector(".edit-item-select");
+        const qtyInput = row.querySelector(".edit-qty-input");
+        const preview = row.querySelector(".edit-line-preview");
+        const option = select.options[select.selectedIndex];
+        const price = option ? Number(option.dataset.price || 0) : 0;
+        const qty = Math.max(0, Number(qtyInput.value || 0));
+        const lineSum = price * qty;
+        total += lineSum;
+        preview.textContent = "$" + lineSum.toFixed(2);
+      });
+      editEstimatedTotalEl.textContent = "$" + total.toFixed(2);
+    }
+
+    document.querySelectorAll(".edit-order-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const orderId = Number(btn.dataset.orderId);
+        const targetOrder = ORDERS_DATA.find((o) => Number(o.id) === orderId);
+        if (!targetOrder) return;
+
+        editOrderIdInput.value = String(orderId);
+        editTitle.textContent = `#${orderId} (${targetOrder.status})`;
+        editReasonInput.value = "";
+        editLineItemsContainer.innerHTML = "";
+
+        const lines = Array.isArray(targetOrder.items) && targetOrder.items.length > 0
+          ? targetOrder.items
+          : [{}];
+
+        for (const line of lines) {
+          editLineItemsContainer.appendChild(buildEditRow(line.item_id ?? "", line.quantity ?? 1));
+        }
+
+        recalcEditSubtotal();
+        editPanel.style.display = "block";
+        editPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    });
+
+    editAddRowBtn.addEventListener("click", () => {
+      editLineItemsContainer.appendChild(buildEditRow("", 1));
+      recalcEditSubtotal();
+    });
+
+    cancelEditBtn.addEventListener("click", () => {
+      editPanel.style.display = "none";
+      editLineItemsContainer.innerHTML = "";
+    });
+
+    editLineItemsContainer.addEventListener("input", recalcEditSubtotal);
+    editLineItemsContainer.addEventListener("change", recalcEditSubtotal);
+    editLineItemsContainer.addEventListener("click", (e) => {
+      if (e.target.classList.contains("edit-remove-row")) {
+        const rows = editLineItemsContainer.querySelectorAll(".edit-line-item");
+        if (rows.length > 1) {
+          e.target.closest(".edit-line-item").remove();
+          recalcEditSubtotal();
+        }
+      }
+    });
+
+    editForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      feedback.innerHTML = "";
+
+      const orderId = editOrderIdInput.value;
+      const items = Array.from(editLineItemsContainer.querySelectorAll(".edit-line-item")).map((row) => ({
+        itemId: Number(row.querySelector(".edit-item-select").value),
+        quantity: Number(row.querySelector(".edit-qty-input").value),
+      }));
+
+      const reason = editReasonInput.value.trim();
+
+      try {
+        const res = await fetch(`/orders/${orderId}/items`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+          },
+          body: JSON.stringify({
+            items,
+            ...(reason ? { reason } : {}),
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Failed to edit order."}</div>`;
+          return;
+        }
+
+        feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} updated — New Total: $${Number(data.order.total_amount).toFixed(2)}.</div>`;
+        setTimeout(() => {
+          window.location.href = "/orders?_=" + Date.now();
+        }, 350);
+      } catch (err) {
+        feedback.innerHTML = `<div class="msg-err">Network error while saving order changes.</div>`;
       }
     });
 
@@ -355,67 +566,6 @@
       }).format(dt);
       el.title = `UTC: ${iso}`;
     });
-
-    async function submitOrder(targetStatus, paymentMethod = null) {
-  feedback.innerHTML = "";
-
-  const items = Array.from(lineItemsContainer.querySelectorAll(".line-item")).map((row) => ({
-    itemId: Number(row.querySelector(".item-select").value),
-    quantity: Number(row.querySelector(".qty-input").value),
-  }));
-
-  const bodyPayload = {
-    idempotencyKey: currentIdempotencyKey,
-    items,
-    status: targetStatus,
-  };
-  if (paymentMethod) {
-    bodyPayload.paymentMethod = paymentMethod;
-  }
-
-  try {
-    const res = await fetch("/orders", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "Idempotency-Key": currentIdempotencyKey,
-      },
-      body: JSON.stringify(bodyPayload),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Order failed."}</div>`;
-      return;
-    }
-
-    currentIdempotencyKey = createKey();
-    const paidTag =
-      data.order.payment_status === "PAID"
-        ? ` · PAID (${data.order.payment_method})`
-        : "";
-    feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} created (${data.order.status}${paidTag}) — Total: $${Number(data.order.total_amount).toFixed(2)}</div>`;
-    form.reset();
-    recalcSubtotal();
-    setTimeout(() => {
-      window.location.href = "/orders?_=" + Date.now();
-    }, 350);
-  } catch (err) {
-    feedback.innerHTML = `<div class="msg-err">Network error while punching order.</div>`;
-  }
-}
-
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  await submitOrder("PENDING", null);
-});
-
-quickPayBtn.addEventListener("click", async () => {
-  if (!form.reportValidity()) return;
-  await submitOrder("COMPLETED", quickPaySelect.value);
-});
 
     recalcSubtotal();
   </script>

@@ -1,0 +1,464 @@
+026-11-23 18:08:57.98804+00
+  5 |       14 | PREPARING   | READY     |          3 | Plated and ready | 2026-11-23 18:21:57.504163+00
+  6 |       15 |             | PENDING   |          1 | Order punched    | 2026-11-23 18:22:43.150845+00
+  7 |       15 | PENDING     | PREPARING |          1 |                  | 2026-11-23 18:22:47.585723+00
+  8 |       15 | PREPARING   | READY     |          1 |                  | 2026-11-23 18:22:49.941798+00
+  9 |       15 | READY       | SERVED    |          1 |                  | 2026-11-23 18:22:52.695334+00
+(9 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, order_id, from_status, to_status, changed_by, reason, changed_at FROM public.order_status_history ORDER BY id ASC;"
+ id | order_id | from_status | to_status | changed_by |      reason      |          changed_at           
+----+----------+-------------+-----------+------------+------------------+-------------------------------
+  1 |       13 |             | PENDING   |          3 | Order punched    | 2026-11-23 18:07:03.171659+00
+  2 |       13 | PENDING     | PREPARING |            |                  | 2026-11-23 18:07:03.22494+00
+  3 |       14 |             | PENDING   |          1 | Order punched    | 2026-11-23 18:08:39.595564+00
+  4 |       14 | PENDING     | PREPARING |            |                  | 2026-11-23 18:08:57.98804+00
+  5 |       14 | PREPARING   | READY     |          3 | Plated and ready | 2026-11-23 18:21:57.504163+00
+  6 |       15 |             | PENDING   |          1 | Order punched    | 2026-11-23 18:22:43.150845+00
+  7 |       15 | PENDING     | PREPARING |          1 |                  | 2026-11-23 18:22:47.585723+00
+  8 |       15 | PREPARING   | READY     |          1 |                  | 2026-11-23 18:22:49.941798+00
+  9 |       15 | READY       | SERVED    |          1 |                  | 2026-11-23 18:22:52.695334+00
+(9 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 
+ *  History restored 
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-ap
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 
+ *  History restored 
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db \
+  < db/migrations/007_add_order_payments.sql
+ALTER TABLE
+NOTICE:  constraint "chk_orders_payment_method" of relation "orders" does not exist, skipping
+ALTER TABLE
+NOTICE:  constraint "chk_orders_payment_status" of relation "orders" does not exist, skipping
+ALTER TABLE
+NOTICE:  constraint "chk_orders_paid_consistency" of relation "orders" does not exist, skipping
+ALTER TABLE
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ # Rejecting COMPLETED with missing paymentMethod (400)
+curl -s -i -b /tmp/cookies.txt -X PATCH http://localhost:3000/orders/15/status \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"status":"COMPLETED"}'
+
+# Completing with paymentMethod=UPI (200)
+curl -s -i -b /tmp/cookies.txt -X PATCH http://localhost:3000/orders/15/status \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"status":"COMPLETED","paymentMethod":"UPI","paymentReference":"UPI-998877"}'
+
+# Inspect order payment columns in PostgreSQL
+docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders WHERE id = 15;"
+HTTP/1.1 401 Unauthorized
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 36
+ETag: W/"24-2ya6UNOy8AlxJkjNOyYmjYabP90"
+Date: Tue, 24 Nov 2026 08:23:38 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Authentication required."}HTTP/1.1 401 Unauthorized
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 36
+ETag: W/"24-2ya6UNOy8AlxJkjNOyYmjYabP90"
+Date: Tue, 24 Nov 2026 08:23:38 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Authentication required."} id |  status   | total_amount | payment_method | payment_status | payment_reference |            paid_at            
+----+-----------+--------------+----------------+----------------+-------------------+-------------------------------
+ 15 | COMPLETED |        15.00 | CARD           | PAID           |                   | 2026-11-24 08:22:17.048167+00
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders WHERE id = 15;"
+ id |  status   | total_amount | payment_method | payment_status | payment_reference |            paid_at            
+----+-----------+--------------+----------------+----------------+-------------------+-------------------------------
+ 15 | COMPLETED |        15.00 | CARD           | PAID           |                   | 2026-11-24 08:22:17.048167+00
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders
+> docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders WHERE id=*;"
+> ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders
+docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders WHERE id=*;"
+> ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders
+docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders WHERE id=3;"
+> ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders
+docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, payment_reference, paid_at FROM public.orders WHERE id=3;"
+> ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, status, total_amount, payment_method, payment_status, payment_refer
+> ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^[[200~docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js~^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, status, total_amount, payment_method, payment_status, paid_at FROM public.orders ORDER BY id DESC LIMIT 3;"
+ id |  status   | total_amount | payment_method | payment_status |            paid_at            
+----+-----------+--------------+----------------+----------------+-------------------------------
+ 17 | COMPLETED |        45.99 |                | UNPAID         | 
+ 16 | CANCELLED |        15.00 |                | UNPAID         | 
+ 15 | COMPLETED |        15.00 | CARD           | PAID           | 2026-11-24 08:22:17.048167+00
+(3 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, status, total_amount, payment_method, payment_status, paid_at FROM public.orders ORDER BY id DESC LIMIT 15;"
+ id |  status   | total_amount | payment_method | payment_status |            paid_at            
+----+-----------+--------------+----------------+----------------+-------------------------------
+ 17 | COMPLETED |        45.99 |                | UNPAID         | 
+ 16 | CANCELLED |        15.00 |                | UNPAID         | 
+ 15 | COMPLETED |        15.00 | CARD           | PAID           | 2026-11-24 08:22:17.048167+00
+ 14 | COMPLETED |        45.00 | UPI            | PAID           | 2026-11-24 08:22:43.234206+00
+ 13 | COMPLETED |        45.99 | CASH           | PAID           | 2026-11-24 08:25:46.616129+00
+ 11 | COMPLETED |        10.00 | CARD           | PAID           | 2026-11-24 08:25:58.526479+00
+ 10 | READY     |        70.00 |                | UNPAID         | 
+  9 | CANCELLED |         5.00 |                | UNPAID         | 
+  8 | READY     |        14.00 |                | UNPAID         | 
+  7 | CANCELLED |        45.99 |                | UNPAID         | 
+  6 | READY     |       140.00 |                | UNPAID         | 
+  5 | COMPLETED |         2.00 | UPI            | PAID           | 2026-11-24 08:24:48.160692+00
+  4 | PENDING   |        72.00 |                | UNPAID         | 
+  3 | PREPARING |         2.12 |                | UNPAID         | 
+  2 | CANCELLED |        45.99 |                | UNPAID         | 
+(15 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db   -c "SELECT id, status, total_amount, payment_method, payment_status, paid_at FROM public.orders ORDER BY id DESC LIMIT 15;"
+ id |  status   | total_amount | payment_method | payment_status |            paid_at            
+----+-----------+--------------+----------------+----------------+-------------------------------
+ 19 | COMPLETED |        15.00 | CARD           | PAID           | 2026-11-24 08:42:03.53+00
+ 18 | COMPLETED |        15.00 | CASH           | PAID           | 2026-11-24 08:41:49.029+00
+ 17 | COMPLETED |        45.99 |                | UNPAID         | 
+ 16 | CANCELLED |        15.00 |                | UNPAID         | 
+ 15 | COMPLETED |        15.00 | CARD           | PAID           | 2026-11-24 08:22:17.048167+00
+ 14 | COMPLETED |        45.00 | UPI            | PAID           | 2026-11-24 08:22:43.234206+00
+ 13 | COMPLETED |        45.99 | CASH           | PAID           | 2026-11-24 08:25:46.616129+00
+ 11 | COMPLETED |        10.00 | CARD           | PAID           | 2026-11-24 08:25:58.526479+00
+ 10 | READY     |        70.00 |                | UNPAID         | 
+  9 | CANCELLED |         5.00 |                | UNPAID         | 
+  8 | READY     |        14.00 |                | UNPAID         | 
+  7 | CANCELLED |        45.99 |                | UNPAID         | 
+  6 | READY     |       140.00 |                | UNPAID         | 
+  5 | COMPLETED |         2.00 | UPI            | PAID           | 2026-11-24 08:24:48.160692+00
+  4 | PENDING   |        72.00 |                | UNPAID         | 
+(15 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^[[200~docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js~^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -b /tmp/cookies.txt -X PUT "http://localhost:3000/orders/14/items" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"items":[{"itemId":1,"quantity":2}],"reason":"Customer added extra unit"}'
+HTTP/1.1 401 Unauthorized
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 36
+ETag: W/"24-2ya6UNOy8AlxJkjNOyYmjYabP90"
+Date: Tue, 24 Nov 2026 09:05:32 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -b /tmp/cookies.txt -X PUT "http://localhost:3000/orders/20/items" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"items":[{"itemId":1,"quantity":2}],"reason":"Customer added extra unit"}'
+HTTP/1.1 401 Unauthorized
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 36
+ETag: W/"24-2ya6UNOy8AlxJkjNOyYmjYabP90"
+Date: Tue, 24 Nov 2026 09:06:48 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Authentication required."}ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_curl -s -i -b /tmp/cookies.txt -X PUT "http://localhost:3000/orders/20/items" \://localhost:3000/orders/20/items" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"items":[{"itemId":3,"quantity":2}],"reason":"Customer added extra unit"}'
+HTTP/1.1 401 Unauthorized
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 36
+ETag: W/"24-2ya6UNOy8AlxJkjNOyYmjYabP90"
+Date: Tue, 24 Nov 2026 09:07:51 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Authentication required."}ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_# 1. Refresh session cookie into /tmp/cookies.txtsession cookie into /tmp/cookies.txt
+curl -s -c /tmp/cookies.txt -L -X POST http://localhost:3000/login \
+  -d "username=cashier1&password=Cashier@1234" > /dev/null
+
+# 2. Send the PUT request with a clean URL
+curl -s -i -b /tmp/cookies.txt -X PUT "http://localhost:3000/orders/20/items" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"items":[{"itemId":3,"quantity":2}],"reason":"Customer added extra unit"}'
+HTTP/1.1 500 Internal Server Error
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Security-Policy: default-src 'none'
+Content-Type: text/html; charset=utf-8
+Content-Length: 924
+Date: Tue, 24 Nov 2026 09:08:50 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>ReferenceError: editOrderItems is not defined<br> &nbsp; &nbsp;at editOrder (/app/controllers/orderController.js:142:20)<br> &nbsp; &nbsp;at Layer.handleRequest (/app/node_modules/router/lib/layer.js:152:17)<br> &nbsp; &nbsp;at next (/app/node_modules/router/lib/route.js:157:13)<br> &nbsp; &nbsp;at /app/middleware/authMiddleware.js:28:12<br> &nbsp; &nbsp;at Layer.handleRequest (/app/node_modules/router/lib/layer.js:152:17)<br> &nbsp; &nbsp;at next (/app/node_modules/router/lib/route.js:157:13)<br> &nbsp; &nbsp;at Route.dispatch (/app/node_modules/router/lib/route.js:117:3)<br> &nbsp; &nbsp;at handle (/app/node_modules/router/index.js:435:11)<br> &nbsp; &nbsp;at Layer.handleRequest (/app/node_modules/router/lib/layer.js:152:17)<br> &nbsp; &nbsp;at /app/node_modules/router/index.js:295:15</pre>
+</body>
+</html>
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+docker-compose restart app
+[+] Restarting 1/1
+ ✔ Container inventory_node_app  Started                                                                                  0.5s 
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -c /tmp/cookies.txt -L -X POST http://localhost:3000/login \
+  -d "username=cashier1&password=Cashier@1234" > /dev/null
+
+curl -s -i -b /tmp/cookies.txt -X PUT "http://localhost:3000/orders/20/items" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"items":[{"itemId":3,"quantity":2}],"reason":"Customer added extra unit"}'
+HTTP/1.1 200 OK
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 452
+ETag: W/"1c4-bh3HJg2V8O939fXBgKLHqTQ75Po"
+Date: Tue, 24 Nov 2026 09:11:40 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"order":{"id":20,"idempotency_key":"3b18dc87-3cee-4e83-8a73-ab4dc643b2cf","status":"PENDING","total_amount":"30.00","created_by":3,"created_at":"2026-11-24T09:05:57.661Z","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null},"items":[{"id":22,"order_id":20,"item_id":3,"item_name":"Cocktail Shaker","unit_price":"15.00","quantity":2,"line_total"ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db \ory-app$ docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, status, total_amount, payment_status FROM public.orders WHERE id = 20;" \
+  -c "SELECT id, item_id, item_name, quantity, line_total FROM public.order_items WHERE order_id = 20;" \
+  -c "SELECT id, from_status, to_status, changed_by, reason, changed_at FROM public.order_status_history WHERE order_id = 20 ORDER BY id ASC;"
+ id | status  | total_amount | payment_status 
+----+---------+--------------+----------------
+ 20 | PENDING |        30.00 | UNPAID
+(1 row)
+
+ id | item_id |    item_name    | quantity | line_total 
+----+---------+-----------------+----------+------------
+ 22 |       3 | Cocktail Shaker |        2 |      30.00
+(1 row)
+
+ id | from_status | to_status | changed_by |          reason           |          changed_at           
+----+-------------+-----------+------------+---------------------------+-------------------------------
+ 34 |             | PENDING   |          3 | Order punched             | 2026-11-24 09:05:57.661311+00
+ 35 | PENDING     | PENDING   |          3 | Customer added extra unit | 2026-11-24 09:11:40.125773+00
+(2 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, status, total_amount, payment_status FROM public.orders WHERE id = 20;" \
+  -c "SELECT id, item_id, item_name, quantity, line_total FROM public.order_items WHERE order_id = 20;" \
+  -c "SELECT id, from_status, to_status, changed_by, reason, changed_at FROM public.order_status_history WHERE order_id = 20 ORDER BY id ASC;"
+ id | status  | total_amount | payment_status 
+----+---------+--------------+----------------
+ 20 | PENDING |        30.00 | UNPAID
+(1 row)
+
+ id | item_id |    item_name    | quantity | line_total 
+----+---------+-----------------+----------+------------
+ 22 |       3 | Cocktail Shaker |        2 |      30.00
+(1 row)
+
+ id | from_status | to_status | changed_by |          reason           |          changed_at           
+----+-------------+-----------+------------+---------------------------+-------------------------------
+ 34 |             | PENDING   |          3 | Order punched             | 2026-11-24 09:05:57.661311+00
+ 35 | PENDING     | PENDING   |          3 | Customer added extra unit | 2026-11-24 09:11:40.125773+00
+(2 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ cat <<'EOF' > /tmp/test_order_edit_edges.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE_URL="http://localhost:3000"
+COOKIE_JAR="/tmp/cookies.txt"
+
+# 0. Authenticate session
+curl -sf -c "$COOKIE_JAR" -L -X POST "$BASE_URL/login" \
+  -d "username=cashier1&password=Cashier@1234" > /dev/null
+
+# Helper to query item stock
+get_stock() {
+  local item_id="$1"
+  docker-compose exec -T postgres psql -U my_user -d inventory_db -t -A \
+    -c "SELECT stock_count FROM public.items WHERE id = ${item_id};"
+}
+
+echo "--- 1. Punch fresh PENDING order (item #3 qty=2) ---"
+STOCK3_BEFORE=$(get_stock 3)
+ORDER_ID=$(curl -sf -b "$COOKIE_JAR" -X POST "$BASE_URL/orders" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d "{\"idempotencyKey\":\"edge-edit-$(date +%s%N)\",\"items\":[{\"itemId\":3,\"quantity\":2}]}" \
+/tmp/test_order_edit_edges.sh_edges.shs, changed_by, reason FROM public.order_status_history WHERE order_id = ${ORDER_ID} ORDER
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ cat <<'EOF' > /tmp/test_order_edit_edges.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE_URL="http://localhost:3000"
+COOKIE_JAR="/tmp/cookies.txt"
+
+# 0. Authenticate session
+curl -sf -c "$COOKIE_JAR" -L -X POST "$BASE_URL/login" \
+  -d "username=cashier1&password=Cashier@1234" > /dev/null
+
+# Helper to query item stock
+get_stock() {
+  local item_id="$1"
+  docker-compose exec -T postgres psql -U my_user -d inventory_db -t -A \
+    -c "SELECT stock_count FROM public.items WHERE id = ${item_id};"
+}
+
+echo "--- 1. Punch fresh PENDING order (item #3 qty=2) ---"
+STOCK3_BEFORE=$(get_stock 3)
+ORDER_ID=$(curl -sf -b "$COOKIE_JAR" -X POST "$BASE_URL/orders" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d "{\"idempotencyKey\":\"edge-edit-$(date +%s%N)\",\"items\":[{\"itemId\":3,\"quantity\":2}]}" \
+  | node -e "const d = JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d.order ? d.order.id : '');")
+echo "Created Order #$ORDER_ID | Item #3 stock before: $STOCK3_BEFORE -> after punch: $(get_stock 3)"
+
+echo "--- 2. Decrease qty (2 -> 1) -> should restock +1 on item #3 ---"
+curl -s -i -b "$COOKIE_JAR" -X PUT "$BASE_URL/orders/${ORDER_ID}/items" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"items":[{"itemId":3,"quantity":1}],"reason":"Customer reduced qty to 1"}'
+echo ""
+echo "Item #3 stock after decrease: $(get_stock 3)"
+
+echo "--- 3. Add item #1 (qty=1) alongside item #3 (qty=1) ---"
+curl -s -i -b "$COOKIE_JAR" -X PUT "$BASE_URL/orders/${ORDER_ID}/items" \
+  -H "Content-Type: application/json" \
+/tmp/test_order_edit_edges.sh^Cdges.shs, changed_by, reason FROM public.order_status_history WHERE order_id = ${ORDER_ID} ORDER
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ /tmp/test_order_edit_edges.sh^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ cat <<'EOF' > /tmp/test_order_edit_edges.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE_URL="http://localhost:3000"
+COOKIE_JAR="/tmp/cookies.txt"
+
+# 0. Authenticate session
+curl -sf -c "$COOKIE_JAR" -L -X POST "$BASE_URL/login" \
+  -d "username=cashier1&password=Cashier@1234" > /dev/null
+
+# Helper to query item stock
+get_stock() {
+  local item_id="$1"
+  docker-compose exec -T postgres psql -U my_user -d inventory_db -t -A \
+    -c "SELECT stock_count FROM public.items WHERE id = ${item_id};"
+}
+
+echo "--- 1. Punch fresh PENDING order (item #3 qty=2) ---"
+STOCK3_BEFORE=$(get_stock 3)
+ORDER_ID=$(curl -sf -b "$COOKIE_JAR" -X POST "$BASE_URL/orders" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d "{\"idempotencyKey\":\"edge-edit-$(date +%s%N)\",\"items\":[{\"itemId\":3,\"quantity\":2}]}" \
+  | node -e "const d = JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d.order ? d.order.id : '');")
+echo "Created Order #$ORDER_ID | Item #3 stock before: $STOCK3_BEFORE -> after punch: $(get_stock 3)"
+
+echo "--- 2. Decrease qty (2 -> 1) -> should restock +1 on item #3 ---"
+curl -s -i -b "$COOKIE_JAR" -X PUT "$BASE_URL/orders/${ORDER_ID}/items" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"items":[{"itemId":3,"quantity":1}],"reason":"Customer reduced qty to 1"}'
+echo ""
+echo "Item #3 stock after decrease: $(get_stock 3)"
+
+echo "--- 3. Add item #1 (qty=1) alongside item #3 (qty=1) ---"
+curl -s -i -b "$COOKIE_JAR" -X PUT "$BASE_URL/orders/${ORDER_ID}/items" \
+  -H "Content-Type: application/json" \
+/tmp/test_order_edit_edges.sh_edges.shs, changed_by, reason FROM public.order_status_history WHERE order_id = ${ORDER_ID} ORDER
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ /tmp/test_order_edit_edges.sh
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec app node --check models/orderModel.js controllers/orderController.js routes/orderRouter.js
+docker-compose restart app
+[+] Restarting 1/1
+ ✔ Container inventory_node_app  Started                                                                                  0.5s 
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 

@@ -6,7 +6,11 @@ const {
   transitionOrderStatus,
   editOrderItems,
 } = require("../models/orderModel");
-const { initiateOrderPaymentAttempt } = require("../models/paymentModel");
+const {
+  initiateOrderPaymentAttempt,
+  reconcileMisappliedPayment,
+  ReconciliationError,
+} = require("../models/paymentModel");
 const pool = require("../db/pool");
 
 function extractIdempotencyKey(req) {
@@ -218,6 +222,33 @@ async function createPaymentIntent(req, res) {
     });
   }
 }
+
+async function postReconcilePayment(req, res, next) {
+  try {
+    const { attemptId, wrongOrderId, rightOrderId, reason } = req.body || {};
+
+    const result = await reconcileMisappliedPayment({
+      attemptId,
+      wrongOrderId,
+      rightOrderId,
+      reason: typeof reason === "string" ? reason.trim() : "",
+    });
+
+    return res.status(200).json({
+      message: `Payment attempt #${attemptId} reconciled from order #${wrongOrderId} to order #${rightOrderId}.`,
+      ...result,
+    });
+  } catch (err) {
+    if (err instanceof ReconciliationError) {
+      return res.status(err.statusCode).json({
+        code: err.code,
+        error: err.message,
+      });
+    }
+    return next(err);
+  }
+}
+
 module.exports = {
   punchOrder,
   getOrders,
@@ -225,4 +256,5 @@ module.exports = {
   updateOrderStatus,
   editOrder,
   createPaymentIntent,
+  postReconcilePayment,
 };

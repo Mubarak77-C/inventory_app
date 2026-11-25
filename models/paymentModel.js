@@ -268,8 +268,211 @@ async function initiateOrderPaymentAttempt({
   };
 }
 
+class ReconciliationError extends Error {
+  constructor(code, message, statusCode = 400) {
+    super(message);
+    this.code = code;
+    this.statusCode = statusCode;
+  }
+}
+
+async function reconcileMisappliedPayment({
+  attemptId,
+  wrongOrderId,
+  rightOrderId,
+  reason = "",
+}) {
+  const parsedAttemptId = Number(attemptId);
+  const parsedWrongOrderId = Number(wrongOrderId);
+  const parsedRightOrderId = Number(rightOrderId);
+
+  if (!parsedAttemptId || !parsedWrongOrderId || !parsedRightOrderId) {
+    throw new ReconciliationError(
+      "INVALID_INPUT",
+      "attemptId, wrongOrderId, and rightOrderId are required integers.",
+    );
+  }
+  if (parsedWrongOrderId === parsedRightOrderId) {
+    throw new ReconciliationError(
+      "SAME_ORDER",
+      "wrongOrderId and rightOrderId must be different.",
+    );
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // 1. Lock the payment attempt row
+    const attemptRes = await client.query(
+      `SELECT id, order_id, idempotency_key, provider, provider_payment_id,
+              payment_method, amount, currency, status
+       FROM public.payment_attempts
+       WHERE id = $1
+       FOR UPDATE`,
+      [parsedAttemptId],
+    );
+
+    if (attemptRes.rows.length === 0) {
+      throw new ReconciliationError(
+        "ATTEMPT_NOT_FOUND",
+        `Payment attempt #${parsedAttemptId} not found.`,
+        404,
+      );
+    }
+
+    const attempt = attemptRes.rows[0];
+    if (Number(attempt.order_id) !== parsedWrongOrderId) {
+      throw new ReconciliationError(
+        "ATTEMPT_ORDER_MISMATCH",
+        `Attempt #${parsedAttemptId} belongs to order #${attempt.order_id}, not #${parsedWrongOrderId}.`,
+      );
+    }
+    if (attempt.status !== "SUCCEEDED") {
+      throw new ReconciliationError(
+        "ATTEMPT_NOT_SUCCEEDED",
+        `Only SUCCEEDED attempts can be reconciled (current status: ${attempt.status}).`,
+      );
+    }
+
+    // 2. Lock both orders in deterministic ID order to avoid deadlocks
+    const lowId = Math.min(parsedWrongOrderId, parsedRightOrderId);
+    const highId = Math.max(parsedWrongOrderId, parsedRightOrderId);
+
+    const ordersRes = await client.query(
+      `SELECT id, status, total_amount, payment_status, payment_method, payment_reference, paid_at
+       FROM public.orders
+       WHERE id IN ($1, $2)
+       ORDER BY id ASC
+       FOR UPDATE`,
+      [lowId, highId],
+    );
+
+    const wrongOrder = ordersRes.rows.find(
+      (o) => Number(o.id) === parsedWrongOrderId,
+    );
+    const rightOrder = ordersRes.rows.find(
+      (o) => Number(o.id) === parsedRightOrderId,
+    );
+
+    if (!wrongOrder) {
+      throw new ReconciliationError(
+        "WRONG_ORDER_NOT_FOUND",
+        `Source order #${parsedWrongOrderId} not found.`,
+        404,
+      );
+    }
+    if (!rightOrder) {
+      throw new ReconciliationError(
+        "RIGHT_ORDER_NOT_FOUND",
+        `Target order #${parsedRightOrderId} not found.`,
+        404,
+      );
+    }
+    if (rightOrder.status === "CANCELLED") {
+      throw new ReconciliationError(
+        "TARGET_ORDER_CANCELLED",
+        `Cannot apply payment to cancelled order #${parsedRightOrderId}.`,
+      );
+    }
+    if (rightOrder.payment_status === "PAID") {
+      throw new ReconciliationError(
+        "TARGET_ALREADY_PAID",
+        `Target order #${parsedRightOrderId} is already PAID.`,
+      );
+    }
+    if (Number(attempt.amount) !== Number(rightOrder.total_amount)) {
+      throw new ReconciliationError(
+        "AMOUNT_MISMATCH",
+        `Attempt amount ($${Number(attempt.amount).toFixed(2)}) does not match target order #${parsedRightOrderId} total ($${Number(rightOrder.total_amount).toFixed(2)}).`,
+      );
+    }
+
+    // 3. Mark the misapplied attempt as FAILED with audit trail
+    const auditNote = reason
+      ? `Reassigned from order #${parsedWrongOrderId} to #${parsedRightOrderId}: ${reason}`
+      : `Reassigned from order #${parsedWrongOrderId} to #${parsedRightOrderId}`;
+
+    await client.query(
+      `UPDATE public.payment_attempts
+       SET status = 'FAILED',
+           failure_code = 'reassigned_wrong_order',
+           failure_message = $2
+       WHERE id = $1`,
+      [parsedAttemptId, auditNote],
+    );
+
+    // 4. Revert the wrong order to UNPAID (satisfies chk_orders_paid_consistency)
+    const updatedWrongRes = await client.query(
+      `UPDATE public.orders
+       SET payment_status = 'UNPAID',
+           payment_method = NULL,
+           payment_reference = NULL,
+           paid_at = NULL
+       WHERE id = $1
+       RETURNING id, status, payment_status, payment_method, payment_reference, paid_at`,
+      [parsedWrongOrderId],
+    );
+
+    // 5. Insert a reconciled SUCCEEDED payment attempt on the intended order
+    const reconcileKey = `reconcile-attempt-${parsedAttemptId}-to-order-${parsedRightOrderId}`;
+    const reconcileProviderRef = `${attempt.provider_payment_id}_reconciled`;
+
+    const newAttemptRes = await client.query(
+      `INSERT INTO public.payment_attempts (
+         order_id, idempotency_key, provider, provider_payment_id,
+         payment_method, amount, currency, status
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'SUCCEEDED')
+       RETURNING id, order_id, provider_payment_id, payment_method, amount, currency, status, created_at`,
+      [
+        parsedRightOrderId,
+        reconcileKey,
+        attempt.provider,
+        reconcileProviderRef,
+        attempt.payment_method,
+        attempt.amount,
+        attempt.currency,
+      ],
+    );
+
+    // 6. Settle the intended order as PAID
+    const settledAt = wrongOrder.paid_at || new Date();
+    const updatedRightRes = await client.query(
+      `UPDATE public.orders
+       SET payment_status = 'PAID',
+           payment_method = $2,
+           payment_reference = $3,
+           paid_at = $4
+       WHERE id = $1
+       RETURNING id, status, payment_status, payment_method, payment_reference, paid_at`,
+      [
+        parsedRightOrderId,
+        attempt.payment_method,
+        attempt.provider_payment_id,
+        settledAt,
+      ],
+    );
+
+    await client.query("COMMIT");
+
+    return {
+      reconciledAttempt: newAttemptRes.rows[0],
+      wrongOrder: updatedWrongRes.rows[0],
+      rightOrder: updatedRightRes.rows[0],
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   preparePaymentAttempt,
   finalizePaymentAttempt,
   initiateOrderPaymentAttempt,
+  reconcileMisappliedPayment,
+  ReconciliationError,
 };

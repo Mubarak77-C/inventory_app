@@ -136,4 +136,8 @@ app.use((req, res) => {
 // Start server listener
 app.listen(PORT, () => {
   console.log(`Inventory app listening on http://localhost:${PORT}`);
+  console.log(
+    "Webhook secret configured:",
+    Boolean(process.env.STRIPE_WEBHOOK_SECRET),
+  );
 });

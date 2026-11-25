@@ -26,12 +26,14 @@
     .badge-PREPARING { background: #dbeafe; color: #1e40af; }
     .badge-READY { background: #d1fae5; color: #065f46; }
     .badge-SERVED { background: #ede9fe; color: #5b21b6; }
-    .badge-COMPLETED { background: #dcfce7; color: #166534; }
+    .badge-COMPLETED, .badge-PAID { background: #dcfce7; color: #166534; }
     .badge-CANCELLED { background: #fee2e2; color: #991b1b; }
+    .badge-UNPAID { background: #fef3c7; color: #92400e; }
     .msg-ok { color: #065f46; background: #d1fae5; border: 1px solid #6ee7b7; padding: 0.65rem 0.85rem; border-radius: 6px; }
     .msg-err { color: #991b1b; background: #fee2e2; border: 1px solid #fca5a5; padding: 0.65rem 0.85rem; border-radius: 6px; }
     .actions-cell { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
     .pay-meta { display: block; font-size: 0.76rem; color: #166534; margin-top: 0.2rem; font-weight: 600; }
+    .muted-dash { color: #6b7280; }
     #edit-order-panel { display: none; border-color: #93c5fd; background: #f8fafc; }
   </style>
 </head>
@@ -113,57 +115,36 @@
   <section class="card">
     <h2>Orders (<%= (orders || []).length %>)</h2>
     <table>
- <thead>
-  <tr>
-    <th>ID</th>
-    <th>Status</th>
-    <th>Total</th>
-    <th>Items</th>
-    <th>Staff</th>
-    <th>Created</th>
-    <th>Actions</th>
-    <th>Payment</th>
-    <th>Paid At</th>
-  </tr>
-</thead>
-<tbody>
-  <% if (!orders || orders.length === 0) { %>
-    <tr><td colspan="9">No orders yet.</td></tr>
-  <% } else { %>
-    <% orders.forEach((order) => { %>
-      <td>
-        <% if (order.payment_status === "PAID") { %>
-          <span class="badge bg-success">PAID</span>
-          <% if (order.payment_method) { %>
-            <small class="text-muted">(<%= order.payment_method %>)</small>
-          <% } %>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Status</th>
+          <th>Total</th>
+          <th>Items</th>
+          <th>Staff</th>
+          <th>Created</th>
+          <th>Actions</th>
+          <th>Payment</th>
+          <th>Paid At</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!orders || orders.length === 0) { %>
+          <tr><td colspan="9">No orders yet.</td></tr>
         <% } else { %>
-          <span class="badge bg-warning text-dark">UNPAID</span>
-        <% } %>
-      </td>
-
-      <td>
-        <% if (order.paid_at) { %>
-          <%= new Date(order.paid_at).toLocaleString("en-IN", {
-            dateStyle: "medium",
-            timeStyle: "short"
-          }) %>
-        <% } else { %>
-          <span class="text-muted">—</span>
-        <% } %>
-      </td>
-      <%
-        const st = order.status;
-        const nextMap = {
-          PENDING: "PREPARING",
-          PREPARING: "READY",
-          READY: "SERVED",
-          SERVED: "COMPLETED",
-        };
-        const nextStatus = nextMap[st] || null;
-        const canCancel = st === "PENDING" || st === "PREPARING" || st === "READY";
-        const canEdit = st === "PENDING" || st === "PREPARING" || st === "READY" || st === "SERVED";
-      %>
+          <% orders.forEach((order) => { %>
+            <%
+              const st = order.status;
+              const nextMap = {
+                PENDING: "PREPARING",
+                PREPARING: "READY",
+                READY: "SERVED",
+                SERVED: "COMPLETED",
+              };
+              const nextStatus = nextMap[st] || null;
+              const canCancel = st === "PENDING" || st === "PREPARING" || st === "READY";
+              const canEdit = st === "PENDING" || st === "PREPARING" || st === "READY" || st === "SERVED";
+            %>
             <tr>
               <td><strong>#<%= order.id %></strong></td>
               <td>
@@ -229,25 +210,45 @@
                   </button>
                 <% } %>
                 <% if (!canEdit && !nextStatus && !canCancel) { %>
-                  <span style="color: #6b7280;">—</span>
+                  <span class="muted-dash">—</span>
                 <% } %>
 
                 <% if (st !== "COMPLETED" && st !== "CANCELLED") { %>
-  <select class="quick-row-payment-select" data-order-id="<%= order.id %>" aria-label="Quick pay method">
-    <option value="CASH">CASH</option>
-    <option value="CARD">CARD</option>
-    <option value="UPI">UPI</option>
-  </select>
-  <button
-    type="button"
-    class="status-btn"
-    data-order-id="<%= order.id %>"
-    data-next-status="COMPLETED"
-    data-payment-selector=".quick-row-payment-select"
-  >
-    Quick Pay
-  </button>
-<% } %>
+                  <select class="quick-row-payment-select" data-order-id="<%= order.id %>" aria-label="Quick pay method">
+                    <option value="CASH">CASH</option>
+                    <option value="CARD">CARD</option>
+                    <option value="UPI">UPI</option>
+                  </select>
+                  <button
+                    type="button"
+                    class="status-btn"
+                    data-order-id="<%= order.id %>"
+                    data-next-status="COMPLETED"
+                    data-payment-selector=".quick-row-payment-select"
+                  >
+                    Quick Pay
+                  </button>
+                <% } %>
+              </td>
+              <td>
+                <% if (order.payment_status === "PAID") { %>
+                  <span class="badge badge-PAID">PAID</span>
+                  <% if (order.payment_method) { %>
+                    <small class="muted-dash">(<%= order.payment_method %>)</small>
+                  <% } %>
+                <% } else { %>
+                  <span class="badge badge-UNPAID">UNPAID</span>
+                <% } %>
+              </td>
+              <td>
+                <% if (order.paid_at) { %>
+                  <%= new Date(order.paid_at).toLocaleString("en-IN", {
+                    dateStyle: "medium",
+                    timeStyle: "short"
+                  }) %>
+                <% } else { %>
+                  <span class="muted-dash">—</span>
+                <% } %>
               </td>
             </tr>
           <% }) %>
@@ -256,7 +257,7 @@
     </table>
   </section>
 
- <script id="pos-orders-data" type="application/json"><%- JSON.stringify({
+  <script id="pos-orders-data" type="application/json"><%- JSON.stringify({
     orders: orders || [],
     catalogItems: catalogItems || []
   }).replace(/</g, "\\u003c") %></script>
@@ -553,14 +554,15 @@
 
         const payload = { status: nextStatus };
 
-      if (nextStatus === "COMPLETED") {
-  const row = btn.closest("tr");
-  const customSelector = btn.dataset.paymentSelector;
-  const methodSelect = row
-    ? row.querySelector(customSelector || ".payment-method-select")
-    : null;
-  payload.paymentMethod = methodSelect ? methodSelect.value : "CASH";
-}
+        if (nextStatus === "COMPLETED") {
+          const row = btn.closest("tr");
+          const customSelector = btn.dataset.paymentSelector;
+          const methodSelect = row
+            ? row.querySelector(customSelector || ".payment-method-select")
+            : null;
+          payload.paymentMethod = methodSelect ? methodSelect.value : "CASH";
+        }
+
         btn.disabled = true;
         try {
           const res = await fetch(`/orders/${orderId}/status`, {

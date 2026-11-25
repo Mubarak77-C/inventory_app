@@ -1,6 +1,6 @@
 // db/pool.js
-const { Pool } = require("pg");
 require("dotenv").config();
+const { Pool } = require("pg");
 
 // Reads the DATABASE_URL from your environment (which Docker injects)
 module.exports = new Pool({

@@ -1,0 +1,436 @@
+For **Step 4** of Slice C2, we will send a real HMAC-SHA256 signed `payment_intent.succeeded` webhook against your running Express server for Order `#28` (using the `pi_test_192d0cc947f3856b3620` payment ID recorded earlier), check PostgreSQL to confirm ACID settlement across `payment_webhook_events`, `payment_attempts`, and `orders`, and then replay the exact same signed request to verify duplicate event deduplication.
+
+1. **Confirm an existing provider_payment_id for Order #28:** 1 min.
+Run this query to see the `provider_payment_id` and `payment_method` stored on Order `#28` (earlier you had `pi_test_192d0cc947f3856b3620` with `CARD`):
+
+```bash
+docker-compose exec -T postgres psql -U my_user -d inventory_db -c "SELECT id, order_id, provider_payment_id, payment_method, status FROM public.payment_attempts WHERE order_id = 28 ORDER BY id;"
+
+```
+
+*Verification:* You see row `2` with `provider_payment_id` (`pi_test_192d0cc947f3856b3620`) and `payment_method` (`CARD`).
+
+
+2. **Generate a valid Stripe-Signature and send the webhook via curl:** 2 min.
+Run this command from your project directory (where `.env` has `STRIPE_WEBHOOK_SECRET=whsec_test_local_secret`):
+
+```bash
+SECRET=$(grep '^STRIPE_WEBHOOK_SECRET=' .env | cut -d'=' -f2-)
+TS=$(date +%s)
+EVENT_ID="evt_c2_order28_001"
+PAYLOAD='{"id":"evt_c2_order28_001","type":"payment_intent.succeeded","data":{"object":{"id":"pi_test_192d0cc947f3856b3620","metadata":{"order_id":"28"}}}}'
+SIG=$(printf "%s.%s" "$TS" "$PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $NF}')
+
+curl -s -i -X POST http://localhost:3000/webhooks/stripe \
+  -H "Content-Type: application/json" \
+  -H "Stripe-Signature: t=${TS},v1=${SIG}" \
+  --data-raw "$PAYLOAD"
+
+```
+
+*Verification:* The response returns `HTTP/1.1 200 OK` with `{"received":true,"duplicate":false,"eventId":"evt_c2_order28_001","orderId":28}`.
+
+
+3. **Verify ACID order and payment settlement in PostgreSQL:** 2 min.
+Check all three tables (`payment_webhook_events`, `payment_attempts`, and `orders`) to confirm the event was recorded and Order `#28` is now `PAID`:
+
+```bash
+docker-compose exec -T postgres psql -U my_user -d inventory_db \
+  -c "SELECT event_id, event_type, processed_at FROM public.payment_webhook_events WHERE event_id = 'evt_c2_order28_001';" \
+  -c "SELECT id, order_id, provider_payment_id, status FROM public.payment_attempts WHERE order_id = 28 ORDER BY id;" \
+  -c "SELECT id, status, total_amount, payment_status, payment_method, payment_reference, paid_at FROM public.orders WHERE id = 28;"
+
+```
+
+*Verification:* `payment_webhook_events` has 1 row for `evt_c2_order28_001`, attempt `2` is `SUCCEEDED`, and Order `#28` shows `payment_status = PAID`, `payment_method = CARD`, `payment_reference = pi_test_192d0cc947f3856b3620`, and a non-null `paid_at` timestamp.
+
+
+4. **Replay the exact same signed webhook to test deduplication:** 1 min.
+Run the exact same `curl` command a second time with the same `EVENT_ID` (`evt_c2_order28_001`) and `SIG`:
+
+```bash
+curl -s -i -X POST http://localhost:3000/webhooks/stripe \
+  -H "Content-Type: application/json" \
+  -H "Stripe-Signature: t=${TS},v1=${SIG}" \
+  --data-raw "$PAYLOAD"
+
+```
+
+*Verification:* The response returns `HTTP/1.1 200 OK` with `"duplicate":true`, and `public.payment_webhook_events` still contains only `1` row for `evt_c2_order28_001`.
+
+
+5. **Verify an invalid or tampered signature is rejected:** 1 min.
+Send a request with a bad signature header to confirm spoofing protection works:
+
+```bash
+curl -s -i -X POST http://localhost:3000/webhooks/stripe \
+  -H "Content-Type: application/json" \
+  -H "Stripe-Signature: t=${TS},v1=deadbeef00112233" \
+  --data-raw "$PAYLOAD"
+
+```
+
+*Verification:* The server responds with `HTTP/1.1 400 Bad Request` and `{"error":"Invalid webhook signature."}`, without inserting a new row into `public.payment_webhook_events`.
+
+===
+Everything in Step 4 worked: item #4 returned `{"received":true,"duplicate":true,"eventId":"evt_c2_order28_001","orderId":null}` because `evt_c2_order28_001` was already stored in `public.payment_webhook_events` during item #2, and item #5 rejected the tampered signature with `400` and `{"error":"Invalid webhook signature."}`.
+
+Check the PostgreSQL rows for Order `#28` now to confirm the final settled state across `public.payment_webhook_events`, `public.payment_attempts`, and `public.orders`.
+
+1. **Verify settled state on Order #28 in PostgreSQL:** 1 min.
+Run this query to confirm `evt_c2_order28_001` is recorded once, attempt `2` is `SUCCEEDED`, and Order `#28` is `PAID` with `payment_method` and `paid_at` populated:
+
+```bash
+docker-compose exec -T postgres psql -U my_user -d inventory_db \
+  -c "SELECT event_id, event_type, processed_at FROM public.payment_webhook_events WHERE event_id = 'evt_c2_order28_001';" \
+  -c "SELECT id, order_id, provider_payment_id, status FROM public.payment_attempts WHERE order_id = 28 ORDER BY id;" \
+  -c "SELECT id, status, total_amount, payment_status, payment_method, payment_reference, paid_at FROM public.orders WHERE id = 28;"
+
+```
+
+*Verification:* `payment_webhook_events` has 1 row, attempt `2` has `status = SUCCEEDED`, and `orders` row `28` has `payment_status = PAID`, `payment_method = CARD`, `payment_reference = pi_test_192d0cc947f3856b3620`, and a non-null `paid_at`.
+
+
+2. **Test payment_intent.payment_failed on a new order and failed attempt:** 2 min.
+Create a quick order (for example Order `#29`), initiate a payment attempt, and send a signed `payment_intent.payment_failed` webhook with a unique `event_id` to confirm failed webhooks update `payment_attempts` without marking the order `PAID`:
+
+```bash
+SECRET=$(grep '^STRIPE_WEBHOOK_SECRET=' .env | cut -d'=' -f2-)
+TS=$(date +%s)
+FAIL_PAYLOAD='{"id":"evt_c2_fail_001","type":"payment_intent.payment_failed","data":{"object":{"id":"pi_test_d8ba716a779a91711838","metadata":{"order_id":"28"},"last_payment_error":{"code":"card_declined","message":"Webhook test decline"}}}}'
+FAIL_SIG=$(printf "%s.%s" "$TS" "$FAIL_PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $NF}')
+
+curl -s -i -X POST http://localhost:3000/webhooks/stripe \
+  -H "Content-Type: application/json" \
+  -H "Stripe-Signature: t=${TS},v1=${FAIL_SIG}" \
+  --data-raw "$FAIL_PAYLOAD"
+
+```
+
+
+*Verification:* The endpoint returns `HTTP/1.1 200 OK` with `"duplicate":false`, and `public.payment_webhook_events` gains `evt_c2_fail_001`.
+
+HTTP/1.1 200 OK
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 84
+ETag: W/"54-UOE6KAMOd0o4KAtzOEP7ua+RdkE"
+Date: Wed, 25 Nov 2026 09:29:36 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db \ejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, order_id, provider_payment_id, status, failure_code, failure_message FROM public.payment_attempts WHEREorder_id = 29 ORDER BY id DESC;" \
+  -c "SELECT id, status, total_amount, payment_status, payment_method, payment_reference, paid_at FROM public.orders WHERE id = 29;"
+ id | order_id | provider_payment_id | status | failure_code | failure_message 
+----+----------+---------------------+--------+--------------+-----------------
+(0 rows)
+
+ id | status  | total_amount | payment_status | payment_method | payment_reference | paid_at 
+----+---------+--------------+----------------+----------------+-------------------+---------
+ 29 | PENDING |        45.00 | UNPAID         |                |                   | 
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 
+ *  History restored 
+
+
+ SECRET=$(grep '^STRIPE_WEBHOOK_SECRET=' .env | cut -d'=' -f2-)
+TS=$(date +%s)
+FAIL_PAYLOAD='{"id":"evt_c2_order29_fail_002","type":"payment_intent.payment_failed","data":{"object":{"id":"pi_test_192d0cc947f3856b3620","metadata":{"order_id":"29"},"last_payment_error":{"code":"card_declined","message":"Insufficient funds"}}}}'
+FAIL_SIG=$(printf "%s.%s" "$TS" "$FAIL_PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $NF}')
+
+curl -s -i -X POST http://localhost:3000/webhooks/stripe \
+  -H "Content-Type: application/json" \
+  -H "Stripe-Signature: t=${TS},v1=${FAIL_SIG}" \
+  --data-raw "$FAIL_PAYLOAD"
+HTTP/1.1 200 OK
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 84
+ETag: W/"54-7BpCNwK9drVRzxL7SRYSuha0WW0"
+Date: Wed, 25 Nov 2026 10:45:06 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"received":true,"duplicate":false,"eventId":"evt_c2_order29_fail_002","orderId":28}
+
+
+##
+`TypeError: Cannot destructure property 'username' of 'req.body' as it is undefined` in `authController.js` happened because `/login` expects standard HTML form data (`application/x-www-form-urlencoded`) rather than a JSON payload. Also, only paste lines inside `bash` code blocks into your terminal—pasting numbered step text or prose into bash causes `command not found` and syntax errors.
+
+1. **Log in using form-encoded data and save /tmp/cookies.txt:** 1 min.
+Run this single command with form data (`username` and `password`):
+
+```bash
+curl -s -i -c /tmp/cookies.txt -X POST http://localhost:3000/login \
+  -d "username=admin&password=Admin@1234"
+
+```
+
+*Verification:* The response is `302 Found` (redirecting away from `/login` into the app) instead of a `500` error, and `/tmp/cookies.txt` contains a session cookie.
+
+
+2. **Create a payment attempt for Order #29 using -b /tmp/cookies.txt:** 1 min.
+Send the `POST` request to `/orders/29/payment-intent` with your saved session cookie:
+
+```bash
+curl -s -i -X POST http://localhost:3000/orders/29/payment-intent \
+  -b /tmp/cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"payment_method":"CARD","simulateOutcome":"DECLINE"}'
+
+```
+
+*Verification:* The response returns HTTP `200` or `201` with JSON containing a `provider_payment_id` (`pi_test_...`).
+
+
+3. **Check Order #29's new provider_payment_id in PostgreSQL:** 1 min.
+Run this query to get the `provider_payment_id` for Order `#29`:
+
+```bash
+docker-compose exec -T postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, order_id, provider_payment_id, payment_method, status FROM public.payment_attempts WHERE order_id = 29 ORDER BY id DESC;"
+
+```
+
+*Verification:* The query returns **1 row** with `order_id = 29` and a `provider_payment_id` starting with `pi_test_`.
+
+==
+ curl -s -i -X POST http://localhost:3000/orders/29/payment-intent \
+  -b /tmp/cookies.txt \
+  -H "Content-Type: application/json" \
+  --data-raw '{"paymentMethod":"CARD","payment_method":"CARD","simulateOutcome":"DECLINE"}'
+HTTP/1.1 201 Created
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 546
+ETag: W/"222-XKjJ7MFxtThB55dEpkFkkRbO/qg"
+Date: Wed, 25 Nov 2026 11:11:21 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"replayed":false,"order":{"id":29,"status":"PENDING","total_amount":"45.00","payment_status":"UNPAID"},"paymentAttempt":{"id":"3","order_id":"29","idempotency_key":"order-29-attempt-1","provider":"local_test_gateway","provider_payment_id":"pi_test_057dc22892e3d4683d71","payment_method":"CARD","amount":"45.00","currency":"INR","status":"FAILED","failure_code":"card_declined","failure_message":"Simulated test card decline (insufficient funds or issuer decline)","created_at":"2026-ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db \ker-compose exec -T postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, order_id, provider_payment_id, payment_method, status FROM public.payment_attempts WHERE order_id = 29 ORDER BY id DESC;"
+ id | order_id |     provider_payment_id      | payment_method | status 
+----+----------+------------------------------+----------------+--------
+  3 |       29 | pi_test_057dc22892e3d4683d71 | CARD           | FAILED
+(1 row)
+
+
+SECRET=$(grep '^STRIPE_WEBHOOK_SECRET=' .env | cut -d'=' -f2-)
+TS=$(date +%s)
+PI_29="pi_test_057dc22892e3d4683d71"
+FAIL_PAYLOAD="{\"id\":\"evt_c2_order29_fail_004\",\"type\":\"payment_intent.payment_failed\",\"data\":{\"object\":{\"id\":\"${PI_29}\",\"metadata\":{\"order_id\":\"29\"},\"last_payment_error\":{\"code\":\"card_declined\",\"message\":\"Insufficient funds\"}}}}"
+FAIL_SIG=$(printf "%s.%s" "$TS" "$FAIL_PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $NF}')
+
+curl -s -i -X POST http://localhost:3000/webhooks/stripe \
+  -H "Content-Type: application/json" \
+  -H "Stripe-Signature: t=${TS},v1=${FAIL_SIG}" \
+  --data-raw "$FAIL_PAYLOAD"
+
+
+  ## FOR MAKING ORDER ID 29 FROM ORDER PUNCH IN TABLE THEN ANOTHER PUBLIC.PAYMENT WITH provider_payment_id 
+  $$ GETTING TRANSACTION FAILED AND SUCCEEDED ACCORDINGLY LIKE ORDER ID 28 DONE MUST LOGIN TO DO it
+
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose logs --tail=20 app
+inventory_node_app  | 
+inventory_node_app  | > inventory-app@1.0.0 dev
+inventory_node_app  | > nodemon app.js
+inventory_node_app  | 
+inventory_node_app  | [nodemon] 3.1.14
+inventory_node_app  | [nodemon] to restart at any time, enter `rs`
+inventory_node_app  | [nodemon] watching path(s): *.*
+inventory_node_app  | [nodemon] watching extensions: js,mjs,cjs,json
+inventory_node_app  | [nodemon] starting `node app.js`
+inventory_node_app  | ◇ injected env (4) from .env
+inventory_node_app  | ◇ injected env (0) from .env
+inventory_node_app  | Inventory app listening on http://localhost:3000
+inventory_node_app  | Webhook secret configured: true
+inventory_node_app  | TypeError: Cannot destructure property 'username' of 'req.body' as it is undefined.
+inventory_node_app  |     at exports.postLogin (/app/controllers/authController.js:14:11)
+inventory_node_app  |     at Layer.handleRequest (/app/node_modules/router/lib/layer.js:152:17)
+inventory_node_app  |     at next (/app/node_modules/router/lib/route.js:157:13)
+inventory_node_app  |     at /app/node_modules/express-rate-limit/dist/index.cjs:1096:7
+inventory_node_app  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+inventory_node_app  |     at async /app/node_modules/express-rate-limit/dist/index.cjs:881:5
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ grep -rn "payment-intent\|INVALID_PAYMENT_METHOD\|payment_method\|paymentMethod" routes/ controllers/ services/ 2>/dev/null | head -n 20
+routes/orderRouter.js:24:  "/:id/payment-intent",
+controllers/orderController.js:35:      paymentMethod: req.body?.paymentMethod ?? req.body?.payment_method,
+controllers/orderController.js:105:      paymentMethod: req.body?.paymentMethod ?? req.body?.payment_method,
+controllers/orderController.js:179:    const { paymentMethod, currency, idempotencyKey, simulateOutcome } =
+controllers/orderController.js:194:      paymentMethod,
+services/webhookService.js:87:        `SELECT id, order_id, payment_method, status
+services/webhookService.js:116:             payment_method = COALESCE(payment_method, $2, 'CARD'),
+services/webhookService.js:122:          attempt?.payment_method || null,
+services/paymentGateway.js:25:  paymentMethod,
+services/paymentGateway.js:40:    params.append("metadata[pos_payment_method]", String(paymentMethod));
+services/paymentGateway.js:43:    if (paymentMethod === "CARD") {
+services/paymentGateway.js:48:      params.append("payment_method", testPm);
+services/paymentGateway.js:49:      params.append("payment_method_types[]", "card");
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -X POST http://localhost:3000/orders/29/payment-intent \
+  -b /tmp/cookies.txt \
+  -H "Content-Type: application/json" \
+  --data-raw '{"payment_method":"CARD","simulateOutcome":"DECLINE"}'
+
+docker-compose exec -T postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, order_id, provider_payment_id, payment_method, status FROM public.payment_attempts WHERE order_id = 29 ORDER BY id DESC;"
+HTTP/1.1 400 Bad Request
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 86
+ETag: W/"56-2mwfOr9KBisT8+8ETFicf6eQzdc"
+Date: Wed, 25 Nov 2026 11:10:17 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"code":"INVALID_PAYMENT_METHOD","error":"Payment method must be CASH, CARD, or UPI."} id | order_id | provider_payment_id | payment_method | status 
+----+----------+---------------------+----------------+--------
+(0 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -X POST http://localhost:3000/orders/29/payment-intent \
+  -b /tmp/cookies.txt \
+  -H "Content-Type: application/json" \
+  --data-raw '{"paymentMethod":"CARD","payment_method":"CARD","simulateOutcome":"DECLINE"}'
+HTTP/1.1 201 Created
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 546
+ETag: W/"222-XKjJ7MFxtThB55dEpkFkkRbO/qg"
+Date: Wed, 25 Nov 2026 11:11:21 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"replayed":false,"order":{"id":29,"status":"PENDING","total_amount":"45.00","payment_status":"UNPAID"},"paymentAttempt":{"id":"3","order_id":"29","idempotency_key":"order-29-attempt-1","provider":"local_test_gateway","provider_payment_id":"pi_test_057dc22892e3d4683d71","payment_method":"CARD","amount":"45.00","currency":"INR","status":"FAILED","failure_code":"card_declined","failure_message":"Simulated test card decline (insufficient funds or issuer decline)","created_at":"2026-ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db \ker-compose exec -T postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, order_id, provider_payment_id, payment_method, status FROM public.payment_attempts WHERE order_id = 29 ORDER BY id DESC;"
+ id | order_id |     provider_payment_id      | payment_method | status 
+----+----------+------------------------------+----------------+--------
+  3 |       29 | pi_test_057dc22892e3d4683d71 | CARD           | FAILED
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ SECRET=$(grep '^STRIPE_WEBHOOK_SECRET=' .env | cut -d'=' -f2-)
+TS=$(date +%s)
+PI_29="pi_test_057dc22892e3d4683d71"
+FAIL_PAYLOAD="{\"id\":\"evt_c2_order29_fail_004\",\"type\":\"payment_intent.payment_failed\",\"data\":{\"object\":{\"id\":\"${PI_29}\",\"metadata\":{\"order_id\":\"29\"},\"last_payment_error\":{\"code\":\"card_declined\",\"message\":\"Insufficient funds\"}}}}"
+FAIL_SIG=$(printf "%s.%s" "$TS" "$FAIL_PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $NF}')
+
+curl -s -i -X POST http://localhost:3000/webhooks/stripe \
+  -H "Content-Type: application/json" \
+  -H "Stripe-Signature: t=${TS},v1=${FAIL_SIG}" \
+  --data-raw "$FAIL_PAYLOAD"
+HTTP/1.1 200 OK
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 84
+ETag: W/"54-M4eWi3o3RUVfKq4HwSCE+tjfB74"
+Date: Wed, 25 Nov 2026 11:14:03 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"received":true,"duplicate":false,"eventId":"evt_c2_order29_fail_004","orderId":29}ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db \
+  -c "SELECT id, order_id, provider_payment_id, status, failure_code, failure_message FROM public.payment_attempts WHERE order_id = 29 ORDER BY id DESC;" \
+  -c "SELECT id, status, total_amount, payment_status, payment_method, payment_reference, paid_at FROM public.orders WHERE id = 29;"
+ id | order_id |     provider_payment_id      | status | failure_code  |  failure_message   
+----+----------+------------------------------+--------+---------------+--------------------
+  3 |       29 | pi_test_057dc22892e3d4683d71 | FAILED | card_declined | Insufficient funds
+(1 row)
+
+ id | status  | total_amount | payment_status | payment_method | payment_reference | paid_at 
+----+---------+--------------+----------------+----------------+-------------------+---------
+ 29 | PENDING |        45.00 | UNPAID         |                |                   | 
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose exec -T postgres psql -U my_user -d inventory_db \
+  -c "SELECT event_id, event_type, processed_at FROM public.payment_webhook_events WHERE event_id = 'evt_c2_order29_fail_004';"
+        event_id         |          event_type           |         processed_at          
+-------------------------+-------------------------------+-------------------------------
+ evt_c2_order29_fail_004 | payment_intent.payment_failed | 2026-11-25 11:14:03.851579+00
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -i -X POST http://localhost:3000/webhooks/stripe \
+  -H "Content-Type: application/json" \
+  -H "Stripe-Signature: t=${TS},v1=${FAIL_SIG}" \
+  --data-raw "$FAIL_PAYLOAD"
+HTTP/1.1 200 OK
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 85
+ETag: W/"55-cT5XJr5v3awaN3JJx9rapYsQYBM"
+Date: Wed, 25 Nov 2026 11:16:52 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"received":true,"duplicate":true,"eventId":"evt_c2_order29_fail_004","orderId":null}ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 

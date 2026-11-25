@@ -113,33 +113,57 @@
   <section class="card">
     <h2>Orders (<%= (orders || []).length %>)</h2>
     <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Status</th>
-          <th>Total</th>
-          <th>Items</th>
-          <th>Staff</th>
-          <th>Created</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% if (!orders || orders.length === 0) { %>
-          <tr><td colspan="7">No orders yet.</td></tr>
+ <thead>
+  <tr>
+    <th>ID</th>
+    <th>Status</th>
+    <th>Total</th>
+    <th>Items</th>
+    <th>Staff</th>
+    <th>Created</th>
+    <th>Actions</th>
+    <th>Payment</th>
+    <th>Paid At</th>
+  </tr>
+</thead>
+<tbody>
+  <% if (!orders || orders.length === 0) { %>
+    <tr><td colspan="9">No orders yet.</td></tr>
+  <% } else { %>
+    <% orders.forEach((order) => { %>
+      <td>
+        <% if (order.payment_status === "PAID") { %>
+          <span class="badge bg-success">PAID</span>
+          <% if (order.payment_method) { %>
+            <small class="text-muted">(<%= order.payment_method %>)</small>
+          <% } %>
         <% } else { %>
-          <% orders.forEach((order) => {
-            const st = order.status;
-            const nextMap = {
-              PENDING: "PREPARING",
-              PREPARING: "READY",
-              READY: "SERVED",
-              SERVED: "COMPLETED",
-            };
-            const nextStatus = nextMap[st] || null;
-            const canCancel = st === "PENDING" || st === "PREPARING" || st === "READY";
-            const canEdit = st === "PENDING" || st === "PREPARING" || st === "READY" || st === "SERVED";
-          %>
+          <span class="badge bg-warning text-dark">UNPAID</span>
+        <% } %>
+      </td>
+
+      <td>
+        <% if (order.paid_at) { %>
+          <%= new Date(order.paid_at).toLocaleString("en-IN", {
+            dateStyle: "medium",
+            timeStyle: "short"
+          }) %>
+        <% } else { %>
+          <span class="text-muted">—</span>
+        <% } %>
+      </td>
+      <%
+        const st = order.status;
+        const nextMap = {
+          PENDING: "PREPARING",
+          PREPARING: "READY",
+          READY: "SERVED",
+          SERVED: "COMPLETED",
+        };
+        const nextStatus = nextMap[st] || null;
+        const canCancel = st === "PENDING" || st === "PREPARING" || st === "READY";
+        const canEdit = st === "PENDING" || st === "PREPARING" || st === "READY" || st === "SERVED";
+      %>
             <tr>
               <td><strong>#<%= order.id %></strong></td>
               <td>

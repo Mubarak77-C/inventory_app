@@ -8,6 +8,8 @@ services:
       - DATABASE_URL=postgresql://my_user:${DB_PASSWORD}@postgres:5432/inventory_db
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - SESSION_SECRET=super_secret_inventory_session_key_change_in_prod
+      - NODE_ENV=${NODE_ENV:-development}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       # - SESSION_SECRET=${SESSION_SECRET}    #when using at production level
     volumes:
       - .:/app

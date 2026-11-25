@@ -1,0 +1,727 @@
+# Testing Summary — Payment & Reconciliation (`POST /orders/reconcile-payment`)
+
+Here is a complete Markdown summary of everything tested and verified up to now against `inventory_db` (`inventory_postgres` container) and the Node.js application at `http://localhost:3000`.
+
+---
+
+## 1. Environment, Database & Auth Setup
+
+| Check / Step | Action Taken | Result / Status |
+| --- | --- | --- |
+| **PostgreSQL Schema (`inventory_db`)** | Inspected `public` tables in `inventory_postgres` (`-U my_user -d inventory_db`) | Verified 10 tables exist: `categories`, `chat_history`, `items`, `order_items`, `order_status_history`, `orders`, `payment_attempts`, `payment_webhook_events`, `session`, `users` |
+| **Docker Compose & Env Config** | Checked `.env` and `docker-compose.yml` (`postgres` service / `inventory_postgres` container) | Confirmed app connects via `docker-compose.yml` environment to `inventory_db` (`pgvector/pgvector:pg15`) |
+| **Admin Authentication** | Sent `POST /login` as `admin` (`Admin@1234`) saving session cookie to `/tmp/cookies.txt` | Returned `HTTP/1.1 302 Found` with active authenticated session cookie |
+
+---
+
+## 2. Happy-Path Reconciliation Test (`200 OK`)
+
+* **Setup:** Updated payment attempt `#3` (`order_id = 29`, `amount = 45.00`, `CARD`) to `SUCCEEDED` for testing.
+* **Request:** `POST /orders/reconcile-payment` with `attemptId: 3`, `wrongOrderId: 29`, `rightOrderId: 25` (`total_amount = 45.00`, `UNPAID`, `PREPARING`).
+* **Verified Outcome:**
+* Returned `HTTP/1.1 200 OK`.
+* **Attempt `#3**` was marked `FAILED` with `failure_code = 'reassigned_wrong_order'` and the cashier reason recorded in `failure_message`.
+* **Attempt `#4**` was created on **Order `#25**` (`provider_payment_id = 'pi_test_057dc22892e3d4683d71_reconciled'`, `amount = 45.00`, `currency = 'INR'`, `status = 'SUCCEEDED'`).
+* **Order `#29**` reverted to `payment_status = 'UNPAID'` with `payment_method`, `payment_reference`, and `paid_at` cleared (`null`).
+* **Order `#25**` became `payment_status = 'PAID'` with `payment_method = 'CARD'`, `payment_reference = 'pi_test_057dc22892e3d4683d71'`, and `paid_at` populated.
+
+
+
+---
+
+## 3. Negative / Error-Handling Tests (`400 Bad Request`)
+
+| Error Code | Test Input / Scenario | HTTP Status & Response | Notes / Cleanup |
+| --- | --- | --- | --- |
+| **`SAME_ORDER`** | `attemptId: 4`, `wrongOrderId: 29`, `rightOrderId: 29` | `400 Bad Request` — `{"code":"SAME_ORDER","error":"wrongOrderId and rightOrderId must be different."}` | Triggered immediately when source and target order IDs are identical |
+| **`ATTEMPT_NOT_SUCCEEDED`** | Re-submitting already-`FAILED` `attemptId: 3` (`wrongOrderId: 29`, `rightOrderId: 25`) | `400 Bad Request` — `{"code":"ATTEMPT_NOT_SUCCEEDED","error":"Only SUCCEEDED attempts can be reconciled (current status: FAILED)."}` | Confirms already-reconciled/failed attempts cannot be re-reconciled |
+| **`TARGET_ORDER_CANCELLED`** | Temporarily set attempt `#1` (`15.00`) to `SUCCEEDED` and targeted `CANCELLED` Order `#16` (`wrongOrderId: 28`, `rightOrderId: 16`) | `400 Bad Request` — `{"code":"TARGET_ORDER_CANCELLED","error":"Cannot apply payment to cancelled order #16."}` | Attempt `#1` and Order `#16` were restored afterward (`UPDATE 1` x 2) |
+| **`AMOUNT_MISMATCH`** | Temporarily set attempt `#1` (`15.00`) to `SUCCEEDED` and targeted `UNPAID` Order `#4` (`72.00`) (`wrongOrderId: 28`, `rightOrderId: 4`) | `400 Bad Request` — `{"code":"AMOUNT_MISMATCH","error":"Attempt amount ($15.00) does not match target order #4 total ($72.00)."}` | Attempt `#1` was restored back to `FAILED` (`card_declined`) afterward |
+| **`ATTEMPT_ORDER_MISMATCH`** | `attemptId: 4` (belongs to order `#25`) with distinct `wrongOrderId: 29` and `rightOrderId: 25` | `400 Bad Request` — `{"code":"ATTEMPT_ORDER_MISMATCH","error":"Attempt #4 belongs to order #25, not #29."}` | Verified with distinct `wrongOrderId` and `rightOrderId` values |
+
+---
+
+## 4. What Still Remains to Test
+
+* **`TARGET_ALREADY_PAID`:** Testing against a target order that is already `PAID` (and not `CANCELLED`) with an amount matching the `SUCCEEDED` attempt.
+* **Non-Admin Authorization (`403` / redirect):** Verifying a non-admin user session cannot call `POST /orders/reconcile-payment`.
+* **UI / Browser Verification:** Confirming `http://localhost:3000/orders` renders Order `#25` as `PAID` and Order `#29` as `UNPAID`.
+
+=============
+
+125-    <th>Payment</th>
+126-    <th>Paid At</th>
+127-  </tr>
+128-</thead>
+129-<tbody>
+130-  <% if (!orders || orders.length === 0) { %>
+131-    <tr><td colspan="9">No orders yet.</td></tr>
+132-  <% } else { %>
+133: <% orders.forEach((order) => { %>
+134-  <%
+135-    const st = order.status;
+136-    const nextMap = {
+137-      PENDING: "PREPARING",
+138-      PREPARING: "READY",
+139-      READY: "SERVED",
+140-      SERVED: "COMPLETED",
+141-    };
+142-    const nextStatus = nextMap[st] || null;
+143-    const canCancel = st === "PENDING" || st === "PREPARING" || st === "READY";
+144-    const canEdit = st === "PENDING" || st === "PREPARING" || st === "READY" || st === "SERVED";
+145-  %>
+146-  <tr>
+147-    <!-- Keep your existing 7 <td> cells here: ID, Status, Total, Items, Staff, Created, Actions -->
+148-
+149-    <!-- 8th column: Payment -->
+150-    <td>
+151-      <% if (order.payment_status === "PAID") { %>
+152-        <span class="badge bg-success">PAID</span>
+153-        <% if (order.payment_method) { %>
+154-          <small class="text-muted">(<%= order.payment_method %>)</small>
+155-        <% } %>
+156-      <% } else { %>
+157-        <span class="badge bg-warning text-dark">UNPAID</span>
+158-      <% } %>
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ sed -n '145,210p' views/orders/index.ejs
+  %>
+  <tr>
+    <!-- Keep your existing 7 <td> cells here: ID, Status, Total, Items, Staff, Created, Actions -->
+
+    <!-- 8th column: Payment -->
+    <td>
+      <% if (order.payment_status === "PAID") { %>
+        <span class="badge bg-success">PAID</span>
+        <% if (order.payment_method) { %>
+          <small class="text-muted">(<%= order.payment_method %>)</small>
+        <% } %>
+      <% } else { %>
+        <span class="badge bg-warning text-dark">UNPAID</span>
+      <% } %>
+    </td>
+
+    <!-- 9th column: Paid At -->
+    <td>
+      <% if (order.paid_at) { %>
+        <%= new Date(order.paid_at).toLocaleString("en-IN", {
+          dateStyle: "medium",
+          timeStyle: "short"
+        }) %>
+      <% } else { %>
+        <span class="text-muted">—</span>
+      <% } %>
+    </td>
+  </tr>
+<% }) %>
+      <%
+        const st = order.status;
+        const nextMap = {
+          PENDING: "PREPARING",
+          PREPARING: "READY",
+          READY: "SERVED",
+          SERVED: "COMPLETED",
+        };
+        const nextStatus = nextMap[st] || null;
+        const canCancel = st === "PENDING" || st === "PREPARING" || st === "READY";
+        const canEdit = st === "PENDING" || st === "PREPARING" || st === "READY" || st === "SERVED";
+      %>
+            <tr>
+              <td><strong>#<%= order.id %></strong></td>
+              <td>
+                <span class="badge badge-<%= st %>"><%= st %></span>
+                <% if (st === "COMPLETED" && order.payment_method) { %>
+                  <span class="pay-meta">PAID · <%= order.payment_method %></span>
+                <% } %>
+              </td>
+              <td>$<%= Number(order.total_amount).toFixed(2) %></td>
+              <td>
+                <% (order.items || []).forEach((line, idx) => { %>
+                  <%= line.item_name %> &times; <%= line.quantity %> ($<%= Number(line.line_total).toFixed(2) %>)<%= idx < order.items.length - 1 ? ", " : "" %>
+                <% }) %>
+              </td>
+              <td><%= order.created_by ?? "-" %></td>
+              <td>
+                <time class="order-time" datetime="<%= new Date(order.created_at).toISOString() %>">
+                  <%= new Date(order.created_at).toISOString() %>
+                </time>
+              </td>
+              <td class="actions-cell">
+                <% if (canEdit) { %>
+                  <button
+                    type="button"
+                    class="btn-edit edit-order-btn"
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 
+ *  History restored 
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^[[200~curl -i -b /tmp/cookies.txt \
+>   -X POST http://localhost:3000/orders/reconcile-payment \
+>   -H "Content-Type: application/json" \
+>   -d '{
+>     "attemptId": 1,
+>     "wrongOrderId": 29,
+>     "rightOrderId": 28,
+>     "reason": "Cashier punched card payment on wrong table order"
+>   }'~
+curl: command not found
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders/reconcile-payment \
+  -H "Content-Type: application/json" \
+  -d '{
+    "attemptId": 1,
+    "wrongOrderId": 29,
+    "rightOrderId": 28,
+    "reason": "Cashier punched card payment on wrong table order"
+  }'
+HTTP/1.1 404 Not Found
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: text/html; charset=utf-8
+Content-Length: 2518
+ETag: W/"9d6-kFz7Q1cMQM0DMGXcsUG+CBuWiLM"
+Date: Wed, 25 Nov 2026 16:48:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Page Not Found</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background-color: #f9fafb;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+      }
+      .card {
+        max-width: 28rem;
+        width: 100%;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        padding: 2rem;
+        text-align: center;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 3rem;
+        height: 3rem;
+        border-radius: 9999px;
+        background-color: #fef2f2;
+        color: #dc2626;
+        font-weight: 700;
+        font-size: 1.125rem;
+        margin-bottom: 1rem;
+      }
+      h1 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #111827;
+      }
+      p {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-top: 0.5rem;
+        line-height: 1.5;
+      }
+      .actions {
+        margin-top: 1.5rem;
+        display: flex;
+        justify-content: center;
+        gap: 0.75rem;
+      }
+      .btn-primary {
+        padding: 0.5rem 1rem;
+        background-color: #4f46e5;
+        color: #ffffff;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-radius: 0.5rem;
+        text-decoration: none;
+      }
+      .btn-primary:hover {
+        background-color: #4338ca;
+      }
+      .btn-secondary {
+        padding: 0.5rem 1rem;
+        background-color: #f3f4f6;
+        color: #374151;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-radius: 0.5rem;
+        text-decoration: none;
+      }
+      .btn-secondary:hover {
+        background-color: #e5e7eb;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="badge">404</div>
+      <h1>Page Not Found</h1>
+      <p>We couldn&#39;t find the page you requested.</p>
+      <div class="actions">
+        <a href="/items" class="btn-primary">Back to Dashboard</a>
+        <a href="/categories" class="btn-secondary">View Categories</a>
+      </div>
+    </div>
+  </body>
+</html>
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders/reconcile-payment \
+  -H "Content-Type: application/json" \
+  -d '{
+    "attemptId": 1,
+    "wrongOrderId": 29,
+    "rightOrderId": 28,
+    "reason": "Cashier punched card payment on wrong table order"
+  }'
+curl: (56) Recv failure: Connection reset by peer
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders/reconcile-payment \
+  -H "Content-Type: application/json" \
+  -d '{
+    "attemptId": 1,
+    "wrongOrderId": 29,
+    "rightOrderId": 28,
+    "reason": "Cashier punched card payment on wrong table order"
+  }'
+curl: (56) Recv failure: Connection reset by peer
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ grep -n "module.exports\|exports\." middleware/auth.js
+grep: middleware/auth.js: No such file or directory
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ grep -n "module.exports\|exports\." middleware/authMiddleware.js
+46:module.exports = { requireRole, requireAdmin, attachUserToLocals };
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ psql "$DATABASE_URL" -c "SELECT id, order_id, provider_payment_id, payment_method, amount, status FROM public.payment_attempts ORDER BY id;"
+psql "$DATABASE_URL" -c "SELECT id, status, total_amount, payment_status, payment_method, payment_reference, paid_at FROM public.orders WHERE id IN (28, 29);"
+ERROR:  relation "public.payment_attempts" does not exist
+LINE 1: ...r_payment_id, payment_method, amount, status FROM public.pay...
+                                                             ^
+ERROR:  relation "public.orders" does not exist
+LINE 1: ..., payment_method, payment_reference, paid_at FROM public.ord...
+                                                             ^
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ node -c models/paymentModel.js controllers/orderController.js routes/orderRouter.js
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ grep -E "DATABASE_URL|PGHOST|PGPORT|PGDATABASE|PGUSER" .env 2>/dev/null || env | grep -E "DATABASE_URL|PG"
+set -a; [ -f .env ] && . ./.env; set +a
+psql "$DATABASE_URL" -c "\dt public.*"
+#DATABASE_URL=postgresql://my_user:root@postgres:5432/inventory_db
+#above comment database url because using your real DB_PASSWORD and GEMINI_API_KEY, and removing or commenting out DATABASE_URL so docker-compose.yml controls it):
+        List of relations
+ Schema | Name  | Type  | Owner  
+--------+-------+-------+--------
+ public | users | table | ubuntu
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ npm start
+
+> inventory-app@1.0.0 start
+> node app.js
+
+◇ injected env (0) from .env
+◇ injected env (0) from .env
+Inventory app listening on http://localhost:3000
+Webhook secret configured: true
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ psql "$DATABASE_URL" -c "SELECT id, order_id, provider_payment_id, payment_method, amount, status FROM public.payment_attempts ORDER BY id;"
+psql "$DATABASE_URL" -c "SELECT id, status, total_amount, payment_status, payment_method, payment_reference, paid_at FROM public.orders WHERE id IN (28, 29);"
+ERROR:  relation "public.payment_attempts" does not exist
+LINE 1: ...r_payment_id, payment_method, amount, status FROM public.pay...
+                                                             ^
+ERROR:  relation "public.orders" does not exist
+LINE 1: ..., payment_method, payment_reference, paid_at FROM public.ord...
+                                                             ^
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ grep -n -C 12 "postgres\|POSTGRES_DB\|POSTGRES_USER\|DATABASE_URL" docker-compose.yml
+1-services:
+2-  app:
+3-    build: .
+4-    container_name: inventory_node_app
+5-    ports:
+6-      - "3000:3000"
+7-    environment:
+8:      - DATABASE_URL=postgresql://my_user:${DB_PASSWORD}@postgres:5432/inventory_db
+9-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+10-      - SESSION_SECRET=super_secret_inventory_session_key_change_in_prod
+11-      - NODE_ENV=${NODE_ENV:-development}
+12-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+13-      # - SESSION_SECRET=${SESSION_SECRET}    #when using at production level
+14-    volumes:
+15-      - .:/app
+16-      - /app/node_modules
+17-    command: npm run dev
+18-    depends_on:
+19:      postgres:
+20-        condition: service_healthy
+21-    restart: unless-stopped
+22-
+23:  postgres:
+24-    image: pgvector/pgvector:pg15
+25:    container_name: inventory_postgres
+26-    environment:
+27:      - POSTGRES_USER=my_user
+28-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+29:      - POSTGRES_DB=inventory_db
+30-
+31-    volumes:
+32:      - pgdata:/var/lib/postgresql/data
+33-    healthcheck:
+34-      test: ["CMD-SHELL", "pg_isready -U my_user -d inventory_db"]
+35-      interval: 5s
+36-      timeout: 5s
+37-      retries: 5
+38-    restart: unless-stopped
+39-
+40-volumes:
+41-  pgdata:
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker compose exec postgres psql -U "${POSTGRES_USER:-my_user}" -d "${POSTGRES_DB:-inventory_db}" -c "\dt public.*"
+unknown shorthand flag: 'U' in -U
+
+Usage:  docker [OPTIONS] COMMAND [ARG...]
+
+Run 'docker --help' for more information
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker compose exec postgres psql -U "${POSTGRES_USER:-my_user}" -d "${POSTGRES_DB:-inventory_db}" -c "SELECT id, order_id, provider_payment_id, payment_method, amount, status FROM public.payment_attempts ORDER BY id;"
+docker compose exec postgres psql -U "${POSTGRES_USER:-my_user}" -d "${POSTGRES_DB:-inventory_db}" -c "SELECT id, status, total_amount, payment_status, payment_method, payment_reference, paid_at FROM public.orders WHERE id IN (28, 29);"
+unknown shorthand flag: 'U' in -U
+
+Usage:  docker [OPTIONS] COMMAND [ARG...]
+
+Run 'docker --help' for more information
+unknown shorthand flag: 'U' in -U
+
+Usage:  docker [OPTIONS] COMMAND [ARG...]
+
+Run 'docker --help' for more information
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "\dt public.*"
+                 List of relations
+ Schema |          Name          | Type  |  Owner   
+--------+------------------------+-------+----------
+ public | categories             | table | postgres
+ public | chat_history           | table | postgres
+ public | items                  | table | postgres
+ public | order_items            | table | my_user
+ public | order_status_history   | table | my_user
+ public | orders                 | table | my_user
+ public | payment_attempts       | table | my_user
+ public | payment_webhook_events | table | my_user
+ public | session                | table | my_user
+ public | users                  | table | my_user
+(10 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT id, order_id, provider_payment_id, payment_method, amount, status FROM public.payment_attempts ORDER BY id;"
+docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT id, status, total_amount, payment_status, payment_method, payment_reference, paid_at FROM public.orders WHERE id IN (28, 29);"
+ id | order_id |     provider_payment_id      | payment_method | amount | status 
+----+----------+------------------------------+----------------+--------+--------
+  1 |       28 | pi_test_d8ba716a779a91711838 | CARD           |  15.00 | FAILED
+  2 |       28 | pi_test_192d0cc947f3856b3620 | CARD           |  15.00 | FAILED
+  3 |       29 | pi_test_057dc22892e3d4683d71 | CARD           |  45.00 | FAILED
+(3 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders/reconcile-payment \
+  -H "Content-Type: application/json" \
+  -d '{
+    "attemptId": 1,
+    "wrongOrderId": 29,
+    "rightOrderId": 28,
+    "reason": "Cashier punched card payment on wrong table order"
+  }'
+HTTP/1.1 302 Found
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Location: /login
+Vary: Accept
+Content-Type: text/plain; charset=utf-8
+Content-Length: 28
+Date: Wed, 25 Nov 2026 17:06:35 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+Found. Redirecting to /loginubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -c /tmp/cookies.txt -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "username=admin" \
+  --data-urlencode "password=Admin@1234"
+HTTP/1.1 302 Found
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+RateLimit-Policy: 5;w=900
+RateLimit-Limit: 5
+RateLimit-Remaining: 4
+RateLimit-Reset: 900
+Location: /
+Vary: Accept
+Content-Type: text/plain; charset=utf-8
+Content-Length: 23
+Set-Cookie: connect.sid=s%3AmKrgRW0wfP7ChcNWx5wuUgarzMWFyiZN.7hx7yDIsVtYkUKORUPP%2BWxZdyFmJk2CCnIfjiCtLlyc; Path=/; Expires=Thu, 26 Nov 2026 01:07:26 GMT; HttpOnly; SameSite=Lax
+Date: Wed, 25 Nov 2026 17:07:26 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT id, order_id, provider_payment_id, amount, status FROM public.payment_attempts ORDER BY id;"
+docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT id, status, total_amount, payment_status FROM public.orders WHERE payment_status = 'UNPAID' ORDER BY id;"
+ id | order_id |     provider_payment_id      | amount | status 
+----+----------+------------------------------+--------+--------
+  1 |       28 | pi_test_d8ba716a779a91711838 |  15.00 | FAILED
+  2 |       28 | pi_test_192d0cc947f3856b3620 |  15.00 | FAILED
+  3 |       29 | pi_test_057dc22892e3d4683d71 |  45.00 | FAILED
+(3 rows)
+
+ id |  status   | total_amount | payment_status 
+----+-----------+--------------+----------------
+  1 | COMPLETED |        45.99 | UNPAID
+  2 | CANCELLED |        45.99 | UNPAID
+  3 | PREPARING |         2.12 | UNPAID
+  4 | PENDING   |        72.00 | UNPAID
+  6 | READY     |       140.00 | UNPAID
+  7 | CANCELLED |        45.99 | UNPAID
+  9 | CANCELLED |         5.00 | UNPAID
+ 10 | READY     |        70.00 | UNPAID
+ 16 | CANCELLED |        15.00 | UNPAID
+ 17 | COMPLETED |        45.99 | UNPAID
+ 22 | CANCELLED |        15.00 | UNPAID
+ 25 | PREPARING |        45.00 | UNPAID
+(12 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders/reconcile-payment \
+  -H "Content-Type: application/json" \
+  -d '{
+    "attemptId": ATTEMPT_ID,
+    "wrongOrderId": WRONG_ORDER_ID,
+    "rightOrderId": RIGHT_ORDER_ID,
+    "reason": "Cashier punched card payment on wrong table order"
+  }'
+HTTP/1.1 400 Bad Request
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Security-Policy: default-src 'none'
+Content-Type: text/html; charset=utf-8
+Content-Length: 926
+Date: Wed, 25 Nov 2026 17:09:20 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>SyntaxError: Unexpected token A in JSON at position 19<br> &nbsp; &nbsp;at JSON.parse (&lt;anonymous&gt;)<br> &nbsp; &nbsp;at parse (/app/node_modules/body-parser/lib/types/json.js:93:21)<br> &nbsp; &nbsp;at /app/node_modules/body-parser/lib/read.js:194:18<br> &nbsp; &nbsp;at AsyncResource.runInAsyncScope (node:async_hooks:203:9)<br> &nbsp; &nbsp;at invokeCallback (/app/node_modules/raw-body/index.js:238:16)<br> &nbsp; &nbsp;at done (/app/node_modules/raw-body/index.js:227:7)<br> &nbsp; &nbsp;at IncomingMessage.onEnd (/app/node_modules/raw-body/index.js:287:7)<br> &nbsp; &nbsp;at IncomingMessage.emit (node:events:517:28)<br> &nbsp; &nbsp;at endReadableNT (node:internal/streams/readable:1400:12)<br> &nbsp; &nbsp;at process.processTicksAndRejections (node:internal/process/task_queues:82:21)</pre>
+</body>
+</html>
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "UPDATE public.payment_attempts SET status = 'SUCCEEDED', failure_code = NULL, failure_message = NULL, updated_at = NOW() WHERE id = 3;"
+UPDATE 1
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders/reconcile-payment \
+  -H "Content-Type: application/json" \
+  -d '{"attemptId":3,"wrongOrderId":29,"rightOrderId":25,"reason":"Cashier punched card payment on wrong table order"}'
+HTTP/1.1 200 OK
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 614
+ETag: W/"266-TLH6HesJCLPMFQiQ5VxKGJ0NY/Y"
+Date: Wed, 25 Nov 2026 17:10:35 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"message":"Payment attempt #3 reconciled from order #29 to order #25.","reconciledAttempt":{"id":"4","order_id":"25","provider_payment_id":"pi_test_057dc22892e3d4683d71_reconciled","payment_method":"CARD","amount":"45.00","currency":"INR","status":"SUCCEEDED","created_at":"2026-11-25T17:10:35.208Z"},"wrongOrder":{"id":29,"status":"COMPLETED","payment_status":"UNPAID","payment_method":null,"payment_reference":null,"paid_at":null},"rightOrder":{"id":25,"status":"PREPARING","payment_status":"PAID","payment_method":"CARD","payment_reference":"pi_test_057dc22892e3d4683d71","paid_at":"2026-11-25T11:33:36.644Z"}}ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventdocker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT id, order_id, provider_payment_id, amount, status, failure_code, failure_message FROM public.payment_attempts ORDER BY id;"R BY id;"
+docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT id, status, total_amount, payment_status, payment_method, payment_reference, paid_at FROM public.orders WHERE id IN (25, 29);"
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders/reconcile-payment \
+  -H "Content-Type: application/json" \
+  -d '{"attemptId":3,"wrongOrderId":29,"rightOrderId":25,"reason":"Duplicate reconciliation check"}'
+HTTP/1.1 400 Bad Request
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 110
+ETag: W/"6e-v5Wr6sFtWcv6n7z68GM+SCDpvKM"
+Date: Wed, 25 Nov 2026 17:14:46 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"code":"ATTEMPT_NOT_SUCCEEDED","error":"Only SUCCEEDED attempts can be reconciled (current status: FAILED)."}ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt   -X POST http://localhost:3000/orders/reconcile-payment   -H "Content-Type: application/json"   -d '{"attemptId":3,"wrongOrderId":29,"rightOrderId":25,"reason":"Duplicate reconciliation check"}'^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "UPDATE public.payment_attempts SET status = 'SUCCEEDED', failure_code = NULL, failure_message = NULL, updated_at = NOW() WHERE id = 1;"
+UPDATE 1
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders/reconcile-payment \
+  -H "Content-Type: application/json" \
+  -d '{"attemptId":1,"wrongOrderId":28,"rightOrderId":4,"reason":"Testing amount mismatch"}'
+HTTP/1.1 400 Bad Request
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 107
+ETag: W/"6b-4lm7F/vKUiNWte0XNeK6ljTYv0k"
+Date: Wed, 25 Nov 2026 17:16:13 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"code":"AMOUNT_MISMATCH","error":"Attempt amount ($15.00) does not match target order #4 total ($72.00)."}ubuntu@ubuntu-
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "UPDATE public.payment_attempts SET status = 'FAILED', failure_code = 'card_declined', failure_message = 'Simulated test card decline (insufficient funds or issuer decline)', updated_at = NOW() WHERE id = 1;"
+UPDATE 1
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders/reconcile-payment \
+  -H "Content-Type: application/json" \
+  -d '{"attemptId":4,"wrongOrderId":29,"rightOrderId":29,"reason":"Testing wrong source order ID"}'
+HTTP/1.1 400 Bad Request
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 80
+ETag: W/"50-VKJBCsWhQ7viA9AK4vQJT1XXAX4"
+Date: Wed, 25 Nov 2026 17:18:33 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"code":"SAME_ORDER","error":"wrongOrderId and rightOrderId must be different."}ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ HTTP/1.1 400 Bad Request
+bash: HTTP/1.1: No such file or directory
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "UPDATE public.payment_attempts SET status = 'SUCCEEDED', failure_code = NULL, failure_message = NULL, updated_at = NOW() WHERE id = 1;"
+docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "UPDATE public.orders SET payment_status = 'PAID', payment_method = 'CARD', payment_reference = 'pi_test_already_paid', paid_at = NOW() WHERE id = 16;"
+UPDATE 1
+UPDATE 1
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders/reconcile-payment \
+  -H "Content-Type: application/json" \
+  -d '{"attemptId":1,"wrongOrderId":28,"rightOrderId":16,"reason":"Testing already-paid target order"}'
+HTTP/1.1 400 Bad Request
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 88
+ETag: W/"58-3xyWbZSGzHZKAoUsUrAIFuLKFsY"
+Date: Wed, 25 Nov 2026 17:23:07 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"code":"TARGET_ORDER_CANCELLED","error":"Cannot apply payment to cancelled order #16."}ubuntu@ubuntu-HP-Laptop:~/js_code
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "UPDATE public.payment_attempts SET status = 'FAILED', failure_code = 'card_declined', failure_message = 'Simulated test card decline (insufficient funds or issuer decline)', updated_at = NOW() WHERE id = 1;"
+docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "UPDATE public.orders SET payment_status = 'UNPAID', payment_method = NULL, payment_reference = NULL, paid_at = NULL WHERE id = 16;"
+UPDATE 1
+UPDATE 1
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders/reconcile-payment \
+  -H "Content-Type: application/json" \
+  -d '{"attemptId":4,"wrongOrderId":29,"rightOrderId":25,"reason":"Testing wrong source order ID"}'
+HTTP/1.1 400 Bad Request
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 85
+ETag: W/"55-3C2V1pOpeQe3VzzHhoo36PiDT3c"
+Date: Wed, 25 Nov 2026 17:24:41 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"code":"ATTEMPT_ORDER_MISMATCH","error":"Attempt #4 belongs to order #25, not #29."}ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 

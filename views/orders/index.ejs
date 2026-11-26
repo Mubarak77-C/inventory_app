@@ -43,6 +43,20 @@
   <section class="card">
     <h2>Punch New Order</h2>
     <form id="punch-order-form">
+      <div class="row" style="margin-bottom: 1rem;">
+  <label for="customer-select">
+    <strong>Customer:</strong>
+    <select id="customer-select" name="customerId" style="min-width: 260px;">
+      <option value="">Walk-in Guest (No Customer)</option>
+      <% (customers || []).forEach((cust) => { %>
+        <option value="<%= cust.id %>">
+          #<%= cust.id %> — <%= cust.name %><%= cust.phone ? ' (' + cust.phone + ')' : '' %>
+        </option>
+      <% }) %>
+    </select>
+  </label>
+  <button type="button" id="open-customer-modal" title="Add New Customer">+ Add Customer</button>
+</div>
       <div id="line-items">
         <div class="row line-item">
           <label>
@@ -257,6 +271,46 @@
     </table>
   </section>
 
+<div id="customer-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; z-index:1000;">
+  <div style="background:#fff; border-radius:8px; padding:1.25rem 1.5rem; width:100%; max-width:460px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+      <h3 style="margin:0;">Add Customer Details</h3>
+      <button type="button" id="close-customer-modal">&times;</button>
+    </div>
+    <form id="add-customer-form">
+      <div style="margin-bottom:0.6rem;">
+        <label style="display:block; font-weight:600;">Customer Name *</label>
+        <input type="text" id="cust-name" name="name" required placeholder="Full name" style="width:100%; box-sizing:border-box;" />
+      </div>
+      <div style="margin-bottom:0.6rem;">
+        <label style="display:block;">Phone Number</label>
+        <input type="text" id="cust-phone" name="phone" placeholder="e.g. 9876543210" style="width:100%; box-sizing:border-box;" />
+      </div>
+      <div style="margin-bottom:0.6rem;">
+        <label style="display:block;">Email</label>
+        <input type="email" id="cust-email" name="email" placeholder="customer@example.com" style="width:100%; box-sizing:border-box;" />
+      </div>
+      <div style="margin-bottom:0.6rem;">
+        <label style="display:block;">Address Line 1</label>
+        <input type="text" id="cust-addr1" name="addressLine1" placeholder="House / Street / Building" style="width:100%; box-sizing:border-box;" />
+      </div>
+      <div style="margin-bottom:0.6rem;">
+        <label style="display:block;">Address Line 2</label>
+        <input type="text" id="cust-addr2" name="addressLine2" placeholder="Area / Landmark / City" style="width:100%; box-sizing:border-box;" />
+      </div>
+      <div style="margin-bottom:0.8rem;">
+        <label style="display:block;">Extra Details (Profession / Notes)</label>
+        <textarea id="cust-extra" name="extraDetails" rows="2" placeholder="e.g. Doctor, Company GST, Billing note" style="width:100%; box-sizing:border-box; padding:0.45rem; border-radius:6px; border:1px solid #9ca3af;"></textarea>
+      </div>
+      <div id="customer-modal-feedback" style="margin-bottom:0.6rem;"></div>
+      <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+        <button type="button" id="cancel-customer-modal">Cancel</button>
+        <button type="submit" class="btn-primary">Save Customer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
   <script id="pos-orders-data" type="application/json"><%- JSON.stringify({
     orders: orders || [],
     catalogItems: catalogItems || []
@@ -285,6 +339,67 @@
     const cancelEditBtn = document.getElementById("cancel-edit-btn");
     const editEstimatedTotalEl = document.getElementById("edit-estimated-total");
     const editReasonInput = document.getElementById("edit-reason");
+
+   const customerSelect = document.getElementById("customer-select");
+const customerModal = document.getElementById("customer-modal");
+const addCustomerForm = document.getElementById("add-customer-form");
+const customerModalFeedback = document.getElementById("customer-modal-feedback");
+
+function openCustomerModal() {
+  customerModalFeedback.innerHTML = "";
+  addCustomerForm.reset();
+  customerModal.style.display = "flex";
+  document.getElementById("cust-name").focus();
+}
+
+function closeCustomerModal() {
+  customerModal.style.display = "none";
+}
+
+document.getElementById("open-customer-modal").addEventListener("click", openCustomerModal);
+document.getElementById("close-customer-modal").addEventListener("click", closeCustomerModal);
+document.getElementById("cancel-customer-modal").addEventListener("click", closeCustomerModal);
+
+addCustomerForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  customerModalFeedback.innerHTML = "";
+
+  const payload = {
+    name: document.getElementById("cust-name").value,
+    phone: document.getElementById("cust-phone").value,
+    email: document.getElementById("cust-email").value,
+    addressLine1: document.getElementById("cust-addr1").value,
+    addressLine2: document.getElementById("cust-addr2").value,
+    extraDetails: document.getElementById("cust-extra").value,
+  };
+
+  try {
+    const res = await fetch("/customers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      customerModalFeedback.innerHTML = `<div class="msg-err">${data.error || "Failed to save customer."}</div>`;
+      return;
+    }
+
+    const c = data.customer;
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = `#${c.id} — ${c.name}${c.phone ? " (" + c.phone + ")" : ""}`;
+    customerSelect.appendChild(opt);
+    customerSelect.value = String(c.id);
+    closeCustomerModal();
+  } catch (err) {
+    customerModalFeedback.innerHTML = `<div class="msg-err">Network error saving customer.</div>`;
+  }
+});
+
+// In your existing punch-order-form submit handler, include customerId in the POST /orders body:
+// const customerId = customerSelect.value ? Number(customerSelect.value) : null;
+// body: JSON.stringify({ idempotencyKey: currentIdempotencyKey, customerId, items })
 
     function createKey() {
       if (window.crypto && typeof window.crypto.randomUUID === "function") {

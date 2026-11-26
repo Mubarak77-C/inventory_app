@@ -17,6 +17,7 @@ const itemRouter = require("./routes/itemRouter");
 const categoryRouter = require("./routes/categoryRouter");
 const orderRouter = require("./routes/orderRouter");
 const webhookRouter = require("./routes/webhookRouter");
+const customerRouter = require("./routes/customerRouter");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -125,6 +126,8 @@ app.use("/items", itemRouter);
 app.use("/categories", categoryRouter);
 app.use("/orders", orderRouter);
 app.use("/webhooks", webhookRouter);
+// Mount alongside your existing /orders route
+app.use("/customers", customerRouter);
 
 // 6. 404 Catch-All Handler (MUST always stay at the very bottom)
 app.use((req, res) => {

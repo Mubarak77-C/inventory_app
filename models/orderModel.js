@@ -121,6 +121,7 @@ async function createOrder({
   status = "PENDING",
   paymentMethod = null,
   paymentReference = null,
+  customerId = null,
 }) {
   if (
     typeof idempotencyKey !== "string" ||
@@ -179,11 +180,41 @@ async function createOrder({
   try {
     await client.query("BEGIN");
 
-    // 1. Idempotency check before touching stock
+    // 1. Idempotency check before touching customer or stock
     const existing = await getOrderWithItemsByIdempotencyKey(client, cleanKey);
     if (existing) {
       await client.query("COMMIT");
       return { ...existing, idempotentReplay: true };
+    }
+
+    // 1b. Validate optional customerId (null/empty = walk-in order)
+    let resolvedCustomerId = null;
+    if (
+      customerId !== undefined &&
+      customerId !== null &&
+      String(customerId).trim() !== ""
+    ) {
+      const parsedCustomerId = Number(customerId);
+      if (!Number.isInteger(parsedCustomerId) || parsedCustomerId <= 0) {
+        throw createDomainError(
+          "Invalid customerId.",
+          "INVALID_CUSTOMER_ID",
+          400,
+        );
+      }
+
+      const custRes = await client.query(
+        `SELECT id FROM public.customers WHERE id = $1`,
+        [parsedCustomerId],
+      );
+      if (custRes.rowCount === 0) {
+        throw createDomainError(
+          `Customer #${parsedCustomerId} does not exist.`,
+          "CUSTOMER_NOT_FOUND",
+          404,
+        );
+      }
+      resolvedCustomerId = parsedCustomerId;
     }
 
     // 2. Atomically deduct stock for each requested item
@@ -242,7 +273,7 @@ async function createOrder({
       });
     }
 
-    // 3. Insert order header (with PAID fields when quick-paid)
+    // 3. Insert order header (with PAID fields when quick-paid & optional customer_id)
     const isPaid = normalizedStatus === "COMPLETED";
     const orderInsertRes = await client.query(
       `INSERT INTO public.orders (
@@ -253,9 +284,10 @@ async function createOrder({
          payment_status,
          payment_reference,
          paid_at,
-         created_by
+         created_by,
+         customer_id
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         cleanKey,
@@ -266,6 +298,7 @@ async function createOrder({
         isPaid ? cleanPaymentReference : null,
         isPaid ? new Date() : null,
         actorId,
+        resolvedCustomerId,
       ],
     );
     const createdOrder = orderInsertRes.rows[0];
@@ -334,6 +367,7 @@ async function createOrder({
     client.release();
   }
 }
+
 async function listOrders(limit = 50) {
   const parsedLimit = Number(limit);
   const safeLimit =
@@ -352,6 +386,13 @@ async function listOrders(limit = 50) {
        o.payment_reference,
        o.paid_at,
        o.created_by,
+       o.customer_id,
+       c.name AS customer_name,
+       c.phone AS customer_phone,
+       c.email AS customer_email,
+       c.address_line1 AS customer_address_line1,
+       c.address_line2 AS customer_address_line2,
+       c.extra_details AS customer_extra_details,
        o.created_at,
        COALESCE(
          json_agg(
@@ -367,8 +408,9 @@ async function listOrders(limit = 50) {
          '[]'::json
        ) AS items
      FROM public.orders o
+     LEFT JOIN public.customers c ON c.id = o.customer_id
      LEFT JOIN public.order_items oi ON oi.order_id = o.id
-     GROUP BY o.id
+     GROUP BY o.id, c.id
      ORDER BY o.created_at DESC, o.id DESC
      LIMIT $1`,
     [safeLimit],
@@ -376,7 +418,6 @@ async function listOrders(limit = 50) {
 
   return rows;
 }
-
 /**
  * Transitions an order's status inside a transaction.
  * - Restocks items when moving to CANCELLED.

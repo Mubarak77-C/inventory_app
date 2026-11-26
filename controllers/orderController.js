@@ -11,6 +11,7 @@ const {
   reconcileMisappliedPayment,
   ReconciliationError,
 } = require("../models/paymentModel");
+const { listCustomers } = require("../models/customerModel");
 const pool = require("../db/pool");
 
 function extractIdempotencyKey(req) {
@@ -23,6 +24,37 @@ function extractIdempotencyKey(req) {
   );
 }
 
+async function getOrders(req, res, next) {
+  try {
+    const orders = await listOrders(req.query.limit);
+    const wantsJson =
+      req.xhr ||
+      (req.headers.accept && req.headers.accept.includes("application/json"));
+
+    if (wantsJson) {
+      return res.status(200).json({ orders });
+    }
+
+    const [itemsRes, customers] = await Promise.all([
+      pool.query(
+        `SELECT id, name, price, stock_count
+         FROM public.items
+         ORDER BY name ASC, id ASC`,
+      ),
+      listCustomers(),
+    ]);
+
+    return res.render("orders/index", {
+      orders,
+      catalogItems: itemsRes.rows,
+      customers,
+      currentUserRole: req.session?.role || "",
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 async function punchOrder(req, res, next) {
   try {
     const idempotencyKey = extractIdempotencyKey(req);
@@ -30,6 +62,7 @@ async function punchOrder(req, res, next) {
     const status = req.body?.status || "PENDING";
     const createdBy =
       req.session?.userId ?? req.session?.user?.id ?? req.user?.id ?? null;
+    const customerId = req.body?.customerId ?? req.body?.customer_id ?? null;
 
     const result = await createOrder({
       idempotencyKey,
@@ -39,6 +72,7 @@ async function punchOrder(req, res, next) {
       paymentMethod: req.body?.paymentMethod ?? req.body?.payment_method,
       paymentReference:
         req.body?.paymentReference ?? req.body?.payment_reference,
+      customerId,
     });
 
     const httpStatus = result.idempotentReplay ? 200 : 201;
@@ -62,33 +96,6 @@ async function punchOrder(req, res, next) {
       return res.status(err.statusCode).json(payload);
     }
 
-    return next(err);
-  }
-}
-
-async function getOrders(req, res, next) {
-  try {
-    const orders = await listOrders(req.query.limit);
-    const wantsJson =
-      req.xhr ||
-      (req.headers.accept && req.headers.accept.includes("application/json"));
-
-    if (wantsJson) {
-      return res.status(200).json({ orders });
-    }
-
-    const itemsRes = await pool.query(
-      `SELECT id, name, price, stock_count
-       FROM public.items
-       ORDER BY name ASC, id ASC`,
-    );
-
-    return res.render("orders/index", {
-      orders,
-      catalogItems: itemsRes.rows,
-      currentUserRole: req.session?.role || "",
-    });
-  } catch (err) {
     return next(err);
   }
 }

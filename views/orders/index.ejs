@@ -395,7 +395,7 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          customerModalFeedback.innerHTML = `<div class="msg-err">${data.error \vert{}\vert{} "Failed to save customer."}</div>`; return; }  const c = data.customer; const opt = document.createElement("option"); opt.value = c.id; opt.textContent = `#${c.id} — ${c.name}${c.phone ? " (" + c.phone + ")" : ""}`;
+          customerModalFeedback.innerHTML = `<div class="msg-err">${data.error || "Failed to save customer."}</div>`; return; }  const c = data.customer; const opt = document.createElement("option"); opt.value = c.id; opt.textContent = `#${c.id} — ${c.name}${c.phone ? " (" + c.phone + ")" : ""}`;
         customerSelect.appendChild(opt);
         customerSelect.value = String(c.id);
         closeCustomerModal();
@@ -502,7 +502,7 @@
         const data = await res.json();
 
         if (!res.ok) {
-          feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error \vert{}\vert{} "Order failed."}</div>`; return; }  currentIdempotencyKey = createKey(); const paidTag = data.order.payment_status === "PAID" ? ` · PAID (${data.order.payment_method})`
+          feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Order failed."}</div>`; return; }  currentIdempotencyKey = createKey(); const paidTag = data.order.payment_status === "PAID" ? ` · PAID (${data.order.payment_method})`
             : "";
         feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} created (${data.order.status}${paidTag}) — Total:$${Number(data.order.total_amount).toFixed(2)}</div>`;
         form.reset();
@@ -534,7 +534,7 @@
       for (const cat of CATALOG_DATA) {
         const sel = Number(cat.id) === Number(selectedItemId) ? "selected" : "";
         options.push(
-          `<option value="${cat.id}" data-price="${Number(cat.price)}" ${sel}>#${cat.id} — ${cat.name} ($${Number(cat.price).toFixed(2)} \vert{} Stock:${cat.stock_count})</option>`
+          `<option value="${cat.id}" data-price="${Number(cat.price)}" ${sel}>#${cat.id} — ${cat.name} ($${Number(cat.price).toFixed(2)} | Stock:${cat.stock_count})</option>`
         );
       }
 
@@ -591,7 +591,7 @@
         const data = await res.json();
 
         if (!res.ok) {
-          feedback.innerHTML = `<div class="msg-err"><strong>${data.code \vert{}\vert{} "Error"}:</strong> ${data.error || "Failed to edit order."}</div>`;
+          feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Failed to edit order."}</div>`;
           return;
         }
 
@@ -639,7 +639,7 @@
           const data = await res.json();
 
           if (!res.ok) {
-            feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error \vert{}\vert{} "Status update failed."}</div>`; btn.disabled = false; return; }  const restockNote = Array.isArray(data.restoredItems) && data.restoredItems.length > 0 ? ` (Restocked ${data.restoredItems.length} item line(s))`
+            feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Status update failed."}</div>`; btn.disabled = false; return; }  const restockNote = Array.isArray(data.restoredItems) && data.restoredItems.length > 0 ? ` (Restocked ${data.restoredItems.length} item line(s))`
               : "";
           const paidNote =
             nextStatus === "COMPLETED" && data.order?.payment_method

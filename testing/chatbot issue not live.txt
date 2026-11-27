@@ -1,0 +1,31 @@
+ let me know do you track data latest today date or not mean live. 2) report which item highest sales and lowest sale 3)which item are out of stock list it 4)which item has highest price and lowest price listed
+
+                🤖 Gemini Assistant
+                Hello! Here are the answers based strictly on the current inventory records in our database:
+
+**1. Do we track live data for today's date?**
+The database reflects records up to the timestamps provided (the newest record is Mon Nov 16 2026). It tracks the inventory data currently entered into the system, but it does not track live point-of-sale transactional "sales" data in real-time.
+
+**2. Which item has the highest sales and lowest sales?**
+Based on the available inventory database, sales figures (units sold or revenue generated) are not tracked—only current stock levels, prices, and item descriptions. Therefore, I cannot report on sales.
+
+**3. Which items are out of stock?**
+The following items currently have a stock level of 0:
+*   **Brownies** (Category: Desserts, ID: 9)
+*   **Pepsi cold drink** (Category: Beverage, ID: 4)
+
+**4. Which item has the highest price and lowest price listed?**
+*   **Highest Price:** Blender at **$120.50** (Category: Kitchen, ID: 2)
+*   **Lowest Price (Tie):** 
+    *   Flavored Iced Tea: at **$2.00** (Category: Beverage, ID: 6)
+    *   Brownies at **$2.00** (Category: Desserts, ID: 9)
+
+Please let me know if you need assistance with anything else!
+
+
+    WE NEED TO DO LIVE CHATBOT FETCH IT JUST FETCHING WHERE WE MIGRATE DATA ON VECTOR DB ON 17 NOV UPTO THEN 
+    WE ARE JUST IMPLEMENTATION ORDER WITH PUNCH ORDER AND MAKE PAYMENT WITH POS INVOICE BILL 
+    SO FOR REPORT - I JUST CLICKED SO RECALL FROM CHATBOT BUT WE ARE NOT CONNECT PGVECTOR DATA ON AI SO IT NOT 
+    GETTING REPORT SO WE HAVE TO FIX THIS ISSUE
+    meAN The database MUST reflects records up to the timestamps provided (the newest record is Mon Nov 16 2026).TO LIVE CONVERT 
+              

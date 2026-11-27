@@ -313,7 +313,8 @@
 
   <script id="pos-orders-data" type="application/json"><%- JSON.stringify({
     orders: orders || [],
-    catalogItems: catalogItems || []
+    catalogItems: catalogItems || [],
+    customers: customers || []
   }).replace(/</g, "\\u003c") %></script>
 
   <script>
@@ -472,10 +473,14 @@ addCustomerForm.addEventListener("submit", async (e) => {
         quantity: Number(row.querySelector(".qty-input").value),
       }));
 
+      const customerId =
+            customerSelect && customerSelect.value ? Number(customerSelect.value) : null;
+
       const bodyPayload = {
         idempotencyKey: currentIdempotencyKey,
         items,
         status: targetStatus,
+        customerId,
       };
       if (paymentMethod) {
         bodyPayload.paymentMethod = paymentMethod;

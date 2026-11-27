@@ -1,0 +1,347 @@
+ne (insufficient funds or issuer decline)', updated_at = NOW() WHERE id = 1;"
+docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "UPDATE public.orders SET payment_status = 'UNPAID', payment_method = NULL, payment_reference = NULL, paid_at = NULL WHERE id = 16;"
+UPDATE 1
+UPDATE 1
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders/reconcile-payment \
+  -H "Content-Type: application/json" \
+  -d '{"attemptId":4,"wrongOrderId":29,"rightOrderId":25,"reason":"Testing wrong source order ID"}'
+HTTP/1.1 400 Bad Request
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 85
+ETag: W/"55-3C2V1pOpeQe3VzzHhoo36PiDT3c"
+Date: Wed, 25 Nov 2026 17:24:41 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"code":"ATTEMPT_ORDER_MISMATCH","error":"Attempt #4 belongs to order #25, not #29."}ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 
+ *  History restored 
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/invent
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 
+ *  History restored 
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -i inventory_postgres psql -U my_user -d inventory_db < migrations/009_customers_and_order_link.sql
+bash: migrations/009_customers_and_order_link.sql: No such file or directory
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ mkdir -p migrations && cat <<'EOF' > migrations/009_customers_and_order_link.sql
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS public.customers (
+id SERIAL PRIMARY KEY,
+name VARCHAR(120) NOT NULL CHECK (char_length(trim(name)) > 0),
+email VARCHAR(255),
+phone VARCHAR(30),
+address_line1 TEXT,
+address_line2 TEXT,
+extra_details TEXT,
+created_by INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+EOFMIT;INDEX IF NOT EXISTS idx_orders_customer_id ON public.orders (customer_id);ELETE SET NULL;
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ls -la /home/ubuntu/js_code/the_odin_js/JS_Advance/nodejs/inventory-app/db/migrations/
+total 40
+drwxrwxr-x 2 ubuntu ubuntu 4096 Nov 26 14:40 .
+drwxrwxr-x 3 ubuntu ubuntu 4096 Nov 24 18:46 ..
+-rw-rw-r-- 1 ubuntu ubuntu 4691 Nov 17 19:04 001_initial_schema.sql
+-rw-rw-r-- 1 ubuntu ubuntu  558 Nov 19 15:12 004_create_users_and_sessions.sql
+-rw-rw-r-- 1 ubuntu ubuntu 1398 Nov 23 12:31 005_create_orders.sql
+-rw-rw-r-- 1 ubuntu ubuntu  829 Nov 23 23:06 006_create_order_status_history.sql
+-rw-rw-r-- 1 ubuntu ubuntu  941 Nov 24 12:48 007_add_order_payments.sql
+-rw-rw-r-- 1 ubuntu ubuntu 1219 Nov 24 18:24 008_payment_attempts_and_webhooks.sql
+-rw-rw-r-- 1 ubuntu ubuntu  798 Nov 26 14:41 009_customers_and_order_link.sql
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -i inventory_postgres psql -U my_user -d inventory_db < /home/ubuntu/js_code/the_odin_js/JS_Advance/nodejs/inventory-app/db/migrations/009_customers_and_order_link.sql
+BEGIN
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE INDEX
+COMMIT
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "\d public.customers" -c "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'customer_id';"
+ column_name | data_type 
+-------------+-----------
+ customer_id | integer
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT o.id AS order_id, o.customer_id, c.name, c.phone, c.extra_details FROM public.orders o LEFT JOIN public.customers c ON c.id = o.customer_id ORDER BY o.id DESC LIMIT 5;"
+ order_id | customer_id | name | phone | extra_details 
+----------+-------------+------+-------+---------------
+       31 |             |      |       | 
+       30 |             |      |       | 
+       29 |             |      |       | 
+       28 |             |      |       | 
+       27 |             |      |       | 
+(5 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT o.id AS order_id, o.customer_id, c.name, c.phone, c.extra_details FROM public.orders o LEFT JOIN public.customers c ON c.id = o.customer_id ORDER BY o.id DESC LIMIT 5;"
+ order_id | customer_id | name | phone | extra_details 
+----------+-------------+------+-------+---------------
+       31 |             |      |       | 
+       30 |             |      |       | 
+       29 |             |      |       | 
+       28 |             |      |       | 
+       27 |             |      |       | 
+(5 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker ps
+ps aux | grep -E "node|nodemon|pm2"
+CONTAINER ID   IMAGE                    COMMAND                  CREATED        STATUS                 PORTS                                         NAMES
+9f1e9c104d6a   inventory-app-app        "docker-entrypoint.s…"   27 hours ago   Up 2 hours             0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp   inventory_node_app
+bcfd1219c1ad   pgvector/pgvector:pg15   "docker-entrypoint.s…"   27 hours ago   Up 2 hours (healthy)   5432/tcp                                      inventory_postgres
+root        2147  0.0  0.0   2796  2004 ?        Ss   14:17   0:00 fusermount3 -o rw,nosuid,nodev,fsname=portal,auto_unmount,subtype=portal -- /run/user/1000/doc
+root        2357  0.0  0.6 311268 55160 ?        Sl   14:17   0:00 node /app/node_modules/.bin/nodemon app.js
+ubuntu      8794  0.0  1.9 1518379844 159796 ?   Sl   14:39   0:02 /snap/code/264/usr/share/code/code --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-GB --service-sandbox-type=none --no-sandbox --enable-crash-reporter=4e233b2c-e8e8-4ac1-a968-f8348599ee49,no_channel --user-data-dir=/home/ubuntu/.config/Code --standard-schemes=vscode-webview,vscode-file --secure-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --cors-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --fetch-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,4966607633719470951,9898941345365874059,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,GlobalShortcutsPortal,PdfUseShowSaveFilePicker --disable-features=CalculateNativeWinOcclusion,DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16497404693855180849,9038004095835482622,4 --trace-process-track-uuid=3190708993808206286
+ubuntu      8813  0.1  1.5 1518366740 123748 ?   Sl   14:39   0:05 /snap/code/264/usr/share/code/code --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-GB --service-sandbox-type=none --no-sandbox --enable-crash-reporter=4e233b2c-e8e8-4ac1-a968-f8348599ee49,no_channel --user-data-dir=/home/ubuntu/.config/Code --standard-schemes=vscode-webview,vscode-file --secure-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --cors-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --fetch-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,4966607633719470951,9898941345365874059,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,GlobalShortcutsPortal,PdfUseShowSaveFilePicker --disable-features=CalculateNativeWinOcclusion,DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16497404693855180849,9038004095835482622,4 --trace-process-track-uuid=3190708994745248135
+ubuntu      8814  0.0  1.5 1518383652 124576 ?   Sl   14:39   0:02 /snap/code/264/usr/share/code/code --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-GB --service-sandbox-type=none --no-sandbox --enable-crash-reporter=4e233b2c-e8e8-4ac1-a968-f8348599ee49,no_channel --user-data-dir=/home/ubuntu/.config/Code --standard-schemes=vscode-webview,vscode-file --secure-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --cors-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --fetch-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,4966607633719470951,9898941345365874059,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,GlobalShortcutsPortal,PdfUseShowSaveFilePicker --disable-features=CalculateNativeWinOcclusion,DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16497404693855180849,9038004095835482622,4 --trace-process-track-uuid=3190708995682289984
+ubuntu      8845  0.1  1.5 1518386600 125584 ?   Sl   14:39   0:05 /snap/code/264/usr/share/code/code --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-GB --service-sandbox-type=none --no-sandbox --enable-crash-reporter=4e233b2c-e8e8-4ac1-a968-f8348599ee49,no_channel --user-data-dir=/home/ubuntu/.config/Code --standard-schemes=vscode-webview,vscode-file --secure-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --cors-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --fetch-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,4966607633719470951,9898941345365874059,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,GlobalShortcutsPortal,PdfUseShowSaveFilePicker --disable-features=CalculateNativeWinOcclusion,DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16497404693855180849,9038004095835482622,4 --trace-process-track-uuid=3190708996619331833
+ubuntu      8869  0.6  2.5 1518376040 201216 ?   Sl   14:39   0:22 /snap/code/264/usr/share/code/code --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-GB --service-sandbox-type=none --no-sandbox --dns-result-order=ipv4first --experimental-network-inspection --inspect-port=0 --enable-crash-reporter=4e233b2c-e8e8-4ac1-a968-f8348599ee49,no_channel --user-data-dir=/home/ubuntu/.config/Code --standard-schemes=vscode-webview,vscode-file --secure-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --cors-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --fetch-schemes=vscode-webview,vscode-file,vscode-remote-resource,vscode-managed-remote-resource --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,4966607633719470951,9898941345365874059,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,GlobalShortcutsPortal,PdfUseShowSaveFilePicker --disable-features=CalculateNativeWinOcclusion,DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16497404693855180849,9038004095835482622,4 --trace-process-track-uuid=3190708997556373682
+ubuntu      9634  0.0  2.9 1518434376 233484 ?   Sl   14:39   0:02 /snap/code/264/usr/share/code/code /snap/code/264/usr/share/code/resources/app/node_modules.asar.unpacked/@github/copilot-linux-x64/index.js --headless --no-auto-update --log-level info --stdio --no-auto-login
+ubuntu      9682  0.0  1.2 1518273368 97664 ?    Sl   14:39   0:00 /snap/code/264/usr/share/code/code /home/ubuntu/.vscode/extensions/dbaeumer.vscode-eslint-3.0.34/server/out/eslintServer.js --node-ipc --clientProcessId=8869
+ubuntu      9714  0.0  1.2 1518281564 99972 ?    Sl   14:39   0:00 /snap/code/264/usr/share/code/code /snap/code/264/usr/share/code/resources/app/extensions/json-language-features/server/dist/node/jsonServerMain --node-ipc --clientProcessId=8869
+ubuntu     10555  0.1  2.0 1518273368 160480 ?   Sl   14:42   0:04 /snap/code/264/usr/share/code/code --max-old-space-size=3072 /snap/code/264/usr/share/code/resources/app/extensions/node_modules/typescript/lib/tsserver.js --serverMode partialSemantic --useInferredProjectPerProjectRoot --disableAutomaticTypingAcquisition --cancellationPipeName /tmp/vscode-typescript1000/ccf810f2b20ef3e56d15/tscancellation-268a9f4e9c9b7b199359.tmp* --locale en --noGetErrOnBackgroundUpdate --canUseWatchEvents --validateDefaultNpmLocation --useNodeIpc
+ubuntu     10556  0.8  3.3 1518273368 265736 ?   Sl   14:42   0:28 /snap/code/264/usr/share/code/code --max-old-space-size=3072 /snap/code/264/usr/share/code/resources/app/extensions/node_modules/typescript/lib/tsserver.js --useInferredProjectPerProjectRoot --enableTelemetry --cancellationPipeName /tmp/vscode-typescript1000/ccf810f2b20ef3e56d15/tscancellation-f5f288a52a8450c21162.tmp* --locale en --noGetErrOnBackgroundUpdate --canUseWatchEvents --validateDefaultNpmLocation --useNodeIpc
+ubuntu     10580  0.0  1.6 1518273368 132320 ?   Sl   14:42   0:01 /snap/code/264/usr/share/code/code /snap/code/264/usr/share/code/resources/app/extensions/node_modules/typescript/lib/typingsInstaller.js --globalTypingsCacheLocation /home/ubuntu/.cache/typescript/6.0 --enableTelemetry --typesMapLocation /snap/code/264/usr/share/code/resources/app/extensions/node_modules/typescript/lib/typesMap.json --validateDefaultNpmLocation
+ubuntu     15205  2.5  2.2 1518273368 179488 ?   Sl   15:32   0:09 /snap/code/264/usr/share/code/code /snap/code/264/usr/share/code/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain --node-ipc --clientProcessId=8869
+root       16724  1.7  0.9 10787700 73872 ?      Sl   15:37   0:01 /usr/local/bin/node app.js
+ubuntu     17062  0.0  0.0   6572  2636 pts/1    S+   15:38   0:00 grep --color=auto -E node|nodemon|pm2
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker compose up -d --build
+unknown shorthand flag: 'd' in -d
+
+Usage:  docker [OPTIONS] COMMAND [ARG...]
+
+Run 'docker --help' for more information
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose up -d --build
+[+] Building 2.9s (10/10) FINISHED                                                                        docker:default
+ => [app internal] load build definition from Dockerfile                                                            0.0s
+ => => transferring dockerfile: 523B                                                                                0.0s
+ => [app internal] load metadata for docker.io/library/node:18-alpine                                               1.6s
+ => [app internal] load .dockerignore                                                                               0.0s
+ => => transferring context: 158B                                                                                   0.0s
+ => [app 1/5] FROM docker.io/library/node:18-alpine@sha256:8d6421d663b4c28fd3ebc498332f249011d118945588d0a35cb9bc4  0.0s
+ => => resolve docker.io/library/node:18-alpine@sha256:8d6421d663b4c28fd3ebc498332f249011d118945588d0a35cb9bc4b8ca  0.0s
+ => [app internal] load build context                                                                               0.4s
+ => => transferring context: 256.03kB                                                                               0.4s
+ => CACHED [app 2/5] WORKDIR /app                                                                                   0.0s
+ => CACHED [app 3/5] COPY package*.json ./                                                                          0.0s
+ => CACHED [app 4/5] RUN npm install                                                                                0.0s
+ => [app 5/5] COPY . .                                                                                              0.1s
+ => [app] exporting to image                                                                                        0.5s
+ => => exporting layers                                                                                             0.2s
+ => => exporting manifest sha256:bf9733599eeb5065c61e66e16478543995adb8e3d7328b4d79093f9dc70bc5cc                   0.0s
+ => => exporting config sha256:72e3c64601de112103ab306a1b9cb617ef3295e9c59b52a4a0d38e90a109ac5c                     0.0s
+ => => exporting attestation manifest sha256:4c9059e56126a2d45b816c4a04653142a795ae906026d6748659fc048ef98a6b       0.0s
+ => => exporting manifest list sha256:a5af2ec0e8fadb75ea46a09d12545eddbe5dbc4f9ab3ee385bc420a86a55a63c              0.0s
+ => => naming to docker.io/library/inventory-app-app:latest                                                         0.0s
+ => => unpacking to docker.io/library/inventory-app-app:latest                                                      0.1s
+[+] Running 2/2
+ ✔ Container inventory_postgres  Healthy                                                                            7.1s 
+ ✔ Container inventory_node_app  Started                                                                            7.0s 
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt http://localhost:3000/orders -H "Accept: application/json"
+HTTP/1.1 401 Unauthorized
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 36
+ETag: W/"24-2ya6UNOy8AlxJkjNOyYmjYabP90"
+Date: Thu, 26 Nov 2026 10:09:55 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -c /tmp/cookies.txt -X POST http://localhost:3000/login \X POST http://localhost:3000/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin@1234"}'
+HTTP/1.1 302 Found
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+RateLimit-Policy: 5;w=900
+RateLimit-Limit: 5
+RateLimit-Remaining: 4
+RateLimit-Reset: 900
+Location: /
+Vary: Accept
+Content-Type: text/plain; charset=utf-8
+Content-Length: 23
+Set-Cookie: connect.sid=s%3A7Vz2Xtc2JyUXNyraP3B6VN9FhuL_3IuK.bf80MOlfkK2yg8GQSTk8%2F7WG7I9JGxMrb7fLokTX3so; Path=/; Expires=Thu, 26 Nov 2026 18:11:29 GMT; HttpOnly; SameSite=Lax
+Date: Thu, 26 Nov 2026 10:11:29 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+Found. Redirecting to /ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker restart inveubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker restart inventory_node_app
+docker logs --tail 25 inventory_node_app
+inventory_node_app
+
+> inventory-app@1.0.0 dev
+> nodemon app.js
+
+[nodemon] 3.1.14
+[nodemon] to restart at any time, enter `rs`
+[nodemon] watching path(s): *.*
+[nodemon] watching extensions: js,mjs,cjs,json
+[nodemon] starting `node app.js`
+◇ injected env (2) from .env
+◇ injected env (0) from .env
+Inventory app listening on http://localhost:3000
+Webhook secret configured: true
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -i -b /tmp/cookies.txt http://localhost:3000/orders -H "Accept: application/json"
+HTTP/1.1 200 OK
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Content-Type: application/json; charset=utf-8
+Content-Length: 16396
+ETag: W/"400c-IIsBX6c+rgU0fcp9go4GaxqCDs8"
+Date: Thu, 26 Nov 2026 10:12:29 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"orders":[{"id":31,"idempotency_key":"42793174-fd23-4bd2-aa4e-1a2dfe1320a2","status":"PENDING","total_amount":"45.00","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-25T17:33:18.231Z","items":[{"id":47,"item_id":5,"item_name":"Cold Brew Coffee Keg","unit_price":45,"quantity":1,"line_total":45}]},{"id":30,"idempotency_key":"829afc76-4f52-4e32-9944-d0dbb1f10a89","status":"COMPLETED","total_amount":"15.00","payment_method":"CASH","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-25T12:06:33.453Z","created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-25T12:06:26.052Z","items":[{"id":46,"item_id":3,"item_name":"Cocktail Shaker","unit_price":15,"quantity":1,"line_total":15}]},{"id":29,"idempotency_key":"15178080-83c2-498f-b972-5b4f0e6f55f2","status":"COMPLETED","total_amount":"45.00","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-25T09:25:55.538Z","items":[{"id":45,"item_id":12,"item_name":"Cold Brew Coffee Keg","unit_price":45,"quantity":1,"line_total":45}]},{"id":28,"idempotency_key":"c1-ord-test-1","status":"PENDING","total_amount":"15.00","payment_method":"CARD","payment_status":"PAID","payment_reference":"pi_test_192d0cc947f3856b3620","paid_at":"2026-11-25T09:04:27.487Z","created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-24T17:44:38.907Z","items":[{"id":44,"item_id":3,"item_name":"Cocktail Shaker","unit_price":15,"quantity":1,"line_total":15}]},{"id":27,"idempotency_key":"348c4b4e-3a70-42d8-b479-eb5e058c69a6","status":"COMPLETED","total_amount":"90.00","payment_method":"UPI","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T13:30:35.968Z","created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-24T13:30:03.039Z","items":[{"id":43,"item_id":12,"item_name":"Cold Brew Coffee Keg","unit_price":45,"quantity":2,"line_total":90}]},{"id":26,"idempotency_key":"67066e5b-8698-405e-a3ce-202b1356abac","status":"COMPLETED","total_amount":"45.00","payment_method":"CASH","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T13:29:54.993Z","created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-24T13:29:54.988Z","items":[{"id":41,"item_id":12,"item_name":"Cold Brew Coffee Keg","unit_price":45,"quantity":1,"line_total":45}]},{"id":25,"idempotency_key":"4d126c39-f6d9-4a15-9226-9a66000d0278","status":"PREPARING","total_amount":"45.00","payment_method":"CARD","payment_status":"PAID","payment_reference":"pi_test_057dc22892e3d4683d71","paid_at":"2026-11-25T11:33:36.644Z","created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-24T12:58:42.553Z","items":[{"id":40,"item_id":5,"item_name":"Cold Brew Coffee Keg","unit_price":45,"quantity":1,"line_total":45}]},{"id":24,"idempotency_key":"83b18dd8-2bb4-49c4-9e17-5435f7a9e6ff","status":"COMPLETED","total_amount":"45.99","payment_method":"CASH","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T11:25:20.781Z","created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-24T11:20:32.610Z","items":[{"id":39,"item_id":1,"item_name":"Chef Knife","unit_price":45.99,"quantity":1,"line_total":45.99}]},{"id":23,"idempotency_key":"fb258a6e-7752-4a89-aba7-79b85a6eb8eb","status":"COMPLETED","total_amount":"155.00","payment_method":"UPI","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T11:14:59.605Z","created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-24T11:09:29.072Z","items":[{"id":37,"item_id":3,"item_name":"Cocktail Shaker","unit_price":15,"quantity":1,"line_total":15},{"id":38,"item_id":8,"item_name":"Signature & Craft Cocktails","unit_price":70,"quantity":2,"line_total":140}]},{"id":22,"idempotency_key":"2603ea17-1ea8-406c-8e60-acc86c5d3ce0","status":"CANCELLED","total_amount":"15.00","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-24T09:47:15.673Z","items":[{"id":27,"item_id":3,"item_name":"Cocktail Shaker","unit_price":15,"quantity":1,"line_total":15}]},{"id":20,"idempotency_key":"3b18dc87-3cee-4e83-8a73-ab4dc643b2cf","status":"COMPLETED","total_amount":"169.50","payment_method":"CARD","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T09:47:02.607Z","created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-24T09:05:57.661Z","items":[{"id":23,"item_id":2,"item_name":"Blender","unit_price":120.5,"quantity":1,"line_total":120.5},{"id":24,"item_id":3,"item_name":"Cocktail Shaker","unit_price":15,"quantity":3,"line_total":45},{"id":25,"item_id":11,"item_name":"Vanilla ice-cream","unit_price":4,"quantity":1,"line_total":4}]},{"id":19,"idempotency_key":"72bc0267-8dd3-4e99-b223-fdebfe2880f6","status":"COMPLETED","total_amount":"15.00","payment_method":"CARD","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T08:42:03.530Z","created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-24T08:42:03.520Z","items":[{"id":20,"item_id":3,"item_name":"Cocktail Shaker","unit_price":15,"quantity":1,"line_total":15}]},{"id":18,"idempotency_key":"5b778cff-87f5-43d6-bd07-2565c72e250d","status":"COMPLETED","total_amount":"15.00","payment_method":"CASH","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T08:41:49.029Z","created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-24T08:41:49.024Z","items":[{"id":19,"item_id":3,"item_name":"Cocktail Shaker","unit_price":15,"quantity":1,"line_total":15}]},{"id":17,"idempotency_key":"552bf598-d839-453e-b53e-f2eae9fd0a92","status":"COMPLETED","total_amount":"45.99","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-24T06:06:34.370Z","items":[{"id":18,"item_id":1,"item_name":"Chef Knife","unit_price":45.99,"quantity":1,"line_total":45.99}]},{"id":16,"idempotency_key":"67577c7a-f8d8-4d4c-9d38-fa398b7bfb53","status":"CANCELLED","total_amount":"15.00","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-24T06:06:18.679Z","items":[{"id":17,"item_id":3,"item_name":"Cocktail Shaker","unit_price":15,"quantity":1,"line_total":15}]},{"id":15,"idempotency_key":"3c1a6cd1-efeb-41bb-8705-e72d660b4fd3","status":"COMPLETED","total_amount":"15.00","payment_method":"CARD","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T08:22:17.048Z","created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T18:22:43.150Z","items":[{"id":16,"item_id":3,"item_name":"Cocktail Shaker","unit_price":15,"quantity":1,"line_total":15}]},{"id":14,"idempotency_key":"7f8444ea-4d97-49f3-a991-deca43a9504d","status":"COMPLETED","total_amount":"45.00","payment_method":"UPI","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T08:22:43.234Z","created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T18:08:39.595Z","items":[{"id":15,"item_id":12,"item_name":"Cold Brew Coffee Keg","unit_price":45,"quantity":1,"line_total":45}]},{"id":13,"idempotency_key":"audit-test-1795457223158997771","status":"COMPLETED","total_amount":"45.99","payment_method":"CASH","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T08:25:46.616Z","created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T18:07:03.171Z","items":[{"id":14,"item_id":1,"item_name":"Chef Knife","unit_price":45.99,"quantity":1,"line_total":45.99}]},{"id":11,"idempotency_key":"97c34b3f-667b-4d0b-9a0a-c2fd687d6b35","status":"COMPLETED","total_amount":"10.00","payment_method":"CARD","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T08:25:58.526Z","created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T17:13:47.760Z","items":[{"id":13,"item_id":10,"item_name":"cheesecakes","unit_price":5,"quantity":2,"line_total":10}]},{"id":10,"idempotency_key":"9e461097-e675-4124-bdd3-90e3be926f5f","status":"READY","total_amount":"70.00","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T17:09:10.196Z","items":[{"id":12,"item_id":8,"item_name":"Signature & Craft Cocktails","unit_price":70,"quantity":1,"line_total":70}]},{"id":9,"idempotency_key":"61e05f90-7db8-43ec-b47d-ff7c3f53d5f6","status":"CANCELLED","total_amount":"5.00","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T16:52:57.192Z","items":[{"id":11,"item_id":7,"item_name":"Mint Cooler","unit_price":5,"quantity":1,"line_total":5}]},{"id":8,"idempotency_key":"305e5d53-5343-4bb1-b098-b14dfefac769","status":"COMPLETED","total_amount":"14.00","payment_method":"CASH","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T11:25:43.717Z","created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T16:51:06.995Z","items":[{"id":9,"item_id":10,"item_name":"cheesecakes","unit_price":5,"quantity":2,"line_total":10},{"id":10,"item_id":6,"item_name":"Flavored Iced Tea:","unit_price":2,"quantity":2,"line_total":4}]},{"id":7,"idempotency_key":"race-cancel-1795448072296490758","status":"CANCELLED","total_amount":"45.99","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T15:34:32.317Z","items":[{"id":8,"item_id":1,"item_name":"Chef Knife","unit_price":45.99,"quantity":1,"line_total":45.99}]},{"id":6,"idempotency_key":"660a0998-d719-473f-a449-73d847b6bd40","status":"READY","total_amount":"140.00","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T15:23:56.821Z","items":[{"id":7,"item_id":8,"item_name":"Signature & Craft Cocktails","unit_price":70,"quantity":2,"line_total":140}]},{"id":5,"idempotency_key":"56757fbb-37d9-4f4b-9528-8bccf2ebfcad","status":"COMPLETED","total_amount":"2.00","payment_method":"UPI","payment_status":"PAID","payment_reference":null,"paid_at":"2026-11-24T08:24:48.160Z","created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T11:32:12.179Z","items":[{"id":6,"item_id":6,"item_name":"Flavored Iced Tea:","unit_price":2,"quantity":1,"line_total":2}]},{"id":4,"idempotency_key":"5da4dc47-ba10-4b1c-a1ef-063b6861ee4a","status":"PENDING","total_amount":"72.00","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T11:28:09.103Z","items":[{"id":4,"item_id":6,"item_name":"Flavored Iced Tea:","unit_price":2,"quantity":1,"line_total":2},{"id":5,"item_id":8,"item_name":"Signature & Craft Cocktails","unit_price":70,"quantity":1,"line_total":70}]},{"id":3,"idempotency_key":"278e5bdb-4d86-47e0-9b15-98937fd21747","status":"PREPARING","total_amount":"2.12","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":1,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T11:25:48.785Z","items":[{"id":3,"item_id":4,"item_name":"Pepsi cold drink","unit_price":2.12,"quantity":1,"line_total":2.12}]},{"id":2,"idempotency_key":"curl-order-1","status":"CANCELLED","total_amount":"45.99","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":3,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T10:57:52.323Z","items":[{"id":2,"item_id":1,"item_name":"Chef Knife","unit_price":45.99,"quantity":1,"line_total":45.99}]},{"id":1,"idempotency_key":"test-order-1795428485801","status":"COMPLETED","total_amount":"45.99","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"created_by":null,"customer_id":null,"customer_name":null,"customer_phone":null,"customer_email":null,"customer_address_line1":null,"customer_address_line2":null,"customer_extra_details":null,"created_at":"2026-11-23T10:08:05.802Z","items":[{"id":1,"item_id":1,"item_name":"Chef Knife","unit_price":45.99,"quantity":1,"line_total":45.99}]}]}ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nod
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT o.id AS order_id, o.customer_id, c.name, c.phone, c.extra_details FROM public.orders o LEFT JOIN public.customers c ON c.id = o.customer_id ORDER BY o.id DESC LIMIT 5;"
+ order_id | customer_id | name | phone | extra_details 
+----------+-------------+------+-------+---------------
+       32 |             |      |       | 
+       31 |             |      |       | 
+       30 |             |      |       | 
+       29 |             |      |       | 
+       28 |             |      |       | 
+(5 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT o.id AS order_id, o.customer_id, c.name, c.phone, c.extra_details FROM public.orders o LEFT JOIN public.customers c ON c.id = o.customer_id ORDER BY o.id DESC LIMIT 5;"
+ order_id | customer_id | name | phone | extra_details 
+----------+-------------+------+-------+---------------
+       33 |             |      |       | 
+       32 |             |      |       | 
+       31 |             |      |       | 
+       30 |             |      |       | 
+       29 |             |      |       | 
+(5 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker compose up -d --build
+unknown shorthand flag: 'd' in -d
+
+Usage:  docker [OPTIONS] COMMAND [ARG...]
+
+Run 'docker --help' for more information
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker-compose up -d --build
+[+] Building 1.8s (10/10) FINISHED                                                                        docker:default
+ => [app internal] load build definition from Dockerfile                                                            0.0s
+ => => transferring dockerfile: 523B                                                                                0.0s
+ => [app internal] load metadata for docker.io/library/node:18-alpine                                               1.3s
+ => [app internal] load .dockerignore                                                                               0.0s
+ => => transferring context: 158B                                                                                   0.0s
+ => [app 1/5] FROM docker.io/library/node:18-alpine@sha256:8d6421d663b4c28fd3ebc498332f249011d118945588d0a35cb9bc4  0.1s
+ => => resolve docker.io/library/node:18-alpine@sha256:8d6421d663b4c28fd3ebc498332f249011d118945588d0a35cb9bc4b8ca  0.1s
+ => [app internal] load build context                                                                               0.0s
+ => => transferring context: 3.03kB                                                                                 0.0s
+ => CACHED [app 2/5] WORKDIR /app                                                                                   0.0s
+ => CACHED [app 3/5] COPY package*.json ./                                                                          0.0s
+ => CACHED [app 4/5] RUN npm install                                                                                0.0s
+ => CACHED [app 5/5] COPY . .                                                                                       0.0s
+ => [app] exporting to image                                                                                        0.2s
+ => => exporting layers                                                                                             0.0s
+ => => exporting manifest sha256:bf9733599eeb5065c61e66e16478543995adb8e3d7328b4d79093f9dc70bc5cc                   0.0s
+ => => exporting config sha256:72e3c64601de112103ab306a1b9cb617ef3295e9c59b52a4a0d38e90a109ac5c                     0.0s
+ => => exporting attestation manifest sha256:55eeac5c90eb9d6a7a94f5ddfb04ef41dc8f0cc560bd4d7542dc6f4621d6e2fc       0.0s
+ => => exporting manifest list sha256:cd028d1294df5cfb714eb97711d03067265a2529d8e5808c2de9d2a370678971              0.0s
+ => => naming to docker.io/library/inventory-app-app:latest                                                         0.0s
+ => => unpacking to docker.io/library/inventory-app-app:latest                                                      0.0s
+[+] Running 2/2
+ ✔ Container inventory_postgres  Healthy                                                                            0.0s 
+ ✔ Container inventory_node_app  Started                                                                            1.3s 
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT o.id AS order_id, o.customer_id, c.name, c.phone, c.extra_details FROM public.orders o LEFT JOIN public.customers c ON c.id = o.customer_id ORDER BY o.id DESC LIMIT 5;"
+ order_id | customer_id | name | phone | extra_details 
+----------+-------------+------+-------+---------------
+       33 |             |      |       | 
+       32 |             |      |       | 
+       31 |             |      |       | 
+       30 |             |      |       | 
+       29 |             |      |       | 
+(5 rows)
+^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT id, name, phone, email, extra_details, created_at FROM public.customers ORDER BY id DESC LIMIT 10;"
+ id | name |  phone  |    email    | extra_details |          created_at           
+----+------+---------+-------------+---------------+-------------------------------
+  2 | doe  |         |             |               | 2026-11-26 10:17:03.012403+00
+  1 | john | 9876543 | john@wx.com | extra detail  | 2026-11-26 10:15:17.393312+00
+(2 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT id, status, payment_status, total_amount, customer_id, created_at FROM public.orders WHERE id IN (32, 33) ORDER BY id;"
+ id |  status   | payment_status | total_amount | customer_id |          created_at           
+----+-----------+----------------+--------------+-------------+-------------------------------
+ 32 | COMPLETED | PAID           |         4.00 |             | 2026-11-26 10:16:33.383448+00
+ 33 | COMPLETED | PAID           |        45.99 |             | 2026-11-26 10:17:20.434677+00
+(2 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT o.id AS order_id, o.customer_id, c.name, c.phone, c.extra_details FROM public.orders o LEFT JOIN public.customers c ON c.id = o.customer_id ORDER BY o.id DESC LIMIT 5;"
+ order_id | customer_id | name | phone | extra_details 
+----------+-------------+------+-------+---------------
+       33 |             |      |       | 
+       32 |             |      |       | 
+       31 |             |      |       | 
+       30 |             |      |       | 
+       29 |             |      |       | 
+(5 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT o.id AS order_id, o.customer_id, c.name, c.phone, c.extra_details FROM public.orders o LEFT JOIN public.customers c ON c.id = o.customer_id ORDER BY o.id DESC LIMIT 5;"
+ order_id | customer_id | name | phone | extra_details 
+----------+-------------+------+-------+---------------
+       34 |             |      |       | 
+       33 |             |      |       | 
+       32 |             |      |       | 
+       31 |             |      |       | 
+       30 |             |      |       | 
+(5 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker restart inventory_node_app
+inventory_node_app
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ curl -s -b /tmp/cookies.txt \
+  -X POST http://localhost:3000/orders \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Idempotency-Key: test-cust-link-$(date +%s)" \
+  -d '{"customerId":1,"items":[{"itemId":1,"quantity":1}]}'
+{"idempotentReplay":false,"order":{"id":35,"idempotency_key":"test-cust-link-1795689847","status":"PENDING","total_amount":"45.99","created_by":1,"created_at":"2026-11-26T10:44:07.196Z","payment_method":null,"payment_status":"UNPAID","payment_reference":null,"paid_at":null,"customer_id":1},"items":[{"id":51,"order_id":35,"item_id":1,"item_name":"Chef Knife","unit_price":"45.99","quantity":1,"line_total":"45.99"}]}ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -it inventory_postgres psql -U my_user -d inventory_db -c "SELECT o.id AS order_id, o.customer_id, c.name, c.phone, c.extra_details FROM public.orders o LEFT JOIN public.customers c ON c.id = o.customer_id ORDER BY o.id DESC LIMIT 1;"
+ order_id | customer_id | name |  phone  | extra_details 
+----------+-------------+------+---------+---------------
+       35 |           1 | john | 9876543 | extra detail
+(1 row)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ 

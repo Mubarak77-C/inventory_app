@@ -58,6 +58,31 @@
         </label>
         <button type="button" id="open-customer-modal" title="Add New Customer">+ Add Customer</button>
       </div>
+      <div class="row" style="margin-bottom: 1rem;">
+  <label for="order-type-select">
+    <strong>Order / Customer Type:</strong>
+    <select id="order-type-select" name="orderType">
+      <option value="WALK_IN">Walk-in (Dine-in)</option>
+      <option value="TAKEAWAY">TakeAway (Parcel)</option>
+      <option value="ONLINE">Online (Zomato / Swiggy / etc.)</option>
+    </select>
+  </label>
+
+  <label id="table-number-field" for="table-number-input">
+    <strong>Table Number:</strong>
+    <input type="text" id="table-number-input" name="tableNumber" placeholder="e.g. T1, Table 4" style="width: 130px;" />
+  </label>
+
+  <label id="online-channel-field" for="online-channel-select" style="display: none;">
+    <strong>Platform:</strong>
+    <select id="online-channel-select" name="orderChannel">
+      <option value="">Select / Optional</option>
+      <option value="ZOMATO">Zomato</option>
+      <option value="SWIGGY">Swiggy</option>
+      <option value="DIRECT_WEB">Direct / Other</option>
+    </select>
+  </label>
+</div>
       <div id="line-items">
         <div class="row line-item">
           <label>
@@ -358,6 +383,12 @@
     const customerModal = document.getElementById("customer-modal");
     const addCustomerForm = document.getElementById("add-customer-form");
     const customerModalFeedback = document.getElementById("customer-modal-feedback");
+
+    const orderTypeSelect = document.getElementById("order-type-select");
+const tableNumberField = document.getElementById("table-number-field");
+const tableNumberInput = document.getElementById("table-number-input");
+const onlineChannelField = document.getElementById("online-channel-field");
+const onlineChannelInput = document.getElementById("online-channel-select");
 
     function openCustomerModal() {
       customerModalFeedback.innerHTML = "";
@@ -666,6 +697,26 @@
       }).format(dt);
       el.title = `UTC: ${iso}`;
     });
+
+    function syncOrderTypeFields() {
+  const type = orderTypeSelect.value;
+  const isWalkIn = type === "WALK_IN";
+  const isOnline = type === "ONLINE";
+
+  tableNumberField.style.display = isWalkIn ? "" : "none";
+  tableNumberInput.required = isWalkIn;
+  if (!isWalkIn) {
+    tableNumberInput.value = "";
+  }
+
+  onlineChannelField.style.display = isOnline ? "" : "none";
+  if (!isOnline) {
+    onlineChannelInput.value = "";
+  }
+}
+
+orderTypeSelect.addEventListener("change", syncOrderTypeFields);
+syncOrderTypeFields();
 
     recalcSubtotal();
   </script>

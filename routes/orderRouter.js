@@ -32,4 +32,10 @@ router.post(
   requireAdmin,
   orderController.postReconcilePayment,
 );
+
+router.get(
+  "/:id/invoice",
+  requireRole("admin", "cashier"),
+  orderController.getOrderInvoice,
+);
 module.exports = router;

@@ -850,10 +850,60 @@ async function editOrderItems({
     client.release();
   }
 }
+
+async function getOrderInvoiceById(orderId) {
+  const id = Number(orderId);
+  if (!Number.isInteger(id) || id <= 0) {
+    return null;
+  }
+
+  const orderRes = await pool.query(
+    `SELECT
+       o.id,
+       o.idempotency_key,
+       o.status,
+       o.total_amount,
+       o.payment_method,
+       o.payment_status,
+       o.payment_reference,
+       o.paid_at,
+       o.created_by,
+       o.created_at,
+       o.customer_id,
+       c.name AS customer_name,
+       c.phone AS customer_phone,
+       c.email AS customer_email,
+       c.address_line1 AS customer_address_line1,
+       c.address_line2 AS customer_address_line2,
+       c.extra_details AS customer_extra_details
+     FROM public.orders o
+     LEFT JOIN public.customers c ON c.id = o.customer_id
+     WHERE o.id = $1`,
+    [id],
+  );
+
+  if (orderRes.rowCount === 0) {
+    return null;
+  }
+
+  const itemsRes = await pool.query(
+    `SELECT id, item_id, item_name, unit_price, quantity, line_total
+     FROM public.order_items
+     WHERE order_id = $1
+     ORDER BY id ASC`,
+    [id],
+  );
+
+  return {
+    order: orderRes.rows[0],
+    items: itemsRes.rows,
+  };
+}
 module.exports = {
   createOrder,
   getOrderWithItemsByIdempotencyKey,
   listOrders,
   transitionOrderStatus,
   editOrderItems,
+  getOrderInvoiceById,
 };

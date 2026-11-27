@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>POS Orders — Punch, Track &amp; Manage</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 1160px; margin: 2rem auto; padding: 0 1rem; color: #1f2937; }
+    body { font-family: system-ui, sans-serif; max-width: 1240px; margin: 2rem auto; padding: 0 1rem; color: #1f2937; }
     .card { border: 1px solid #d1d5db; border-radius: 8px; padding: 1.1rem 1.3rem; margin-bottom: 1.5rem; background: #fff; }
     .row { display: flex; gap: 0.65rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.75rem; }
     select, input, button { padding: 0.45rem 0.7rem; font-size: 0.92rem; border-radius: 6px; border: 1px solid #9ca3af; }
-    button { cursor: pointer; background: #f3f4f6; }
-    button:hover:not(:disabled) { background: #e5e7eb; }
+    button, .btn-link { cursor: pointer; background: #f3f4f6; color: #1f2937; text-decoration: none; display: inline-block; padding: 0.42rem 0.68rem; font-size: 0.88rem; border-radius: 6px; border: 1px solid #9ca3af; }
+    button:hover:not(:disabled), .btn-link:hover { background: #e5e7eb; }
     button:disabled { opacity: 0.45; cursor: not-allowed; }
     .btn-primary { background: #111827; color: #fff; border-color: #111827; }
     .btn-primary:hover:not(:disabled) { background: #374151; }
@@ -33,6 +33,7 @@
     .msg-err { color: #991b1b; background: #fee2e2; border: 1px solid #fca5a5; padding: 0.65rem 0.85rem; border-radius: 6px; }
     .actions-cell { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
     .pay-meta { display: block; font-size: 0.76rem; color: #166534; margin-top: 0.2rem; font-weight: 600; }
+    .cust-sub { display: block; font-size: 0.78rem; color: #4b5563; margin-top: 0.15rem; }
     .muted-dash { color: #6b7280; }
     #edit-order-panel { display: none; border-color: #93c5fd; background: #f8fafc; }
   </style>
@@ -44,19 +45,19 @@
     <h2>Punch New Order</h2>
     <form id="punch-order-form">
       <div class="row" style="margin-bottom: 1rem;">
-  <label for="customer-select">
-    <strong>Customer:</strong>
-    <select id="customer-select" name="customerId" style="min-width: 260px;">
-      <option value="">Walk-in Guest (No Customer)</option>
-      <% (customers || []).forEach((cust) => { %>
-        <option value="<%= cust.id %>">
-          #<%= cust.id %> — <%= cust.name %><%= cust.phone ? ' (' + cust.phone + ')' : '' %>
-        </option>
-      <% }) %>
-    </select>
-  </label>
-  <button type="button" id="open-customer-modal" title="Add New Customer">+ Add Customer</button>
-</div>
+        <label for="customer-select">
+          <strong>Customer:</strong>
+          <select id="customer-select" name="customerId" style="min-width: 260px;">
+            <option value="">Walk-in Guest (No Customer)</option>
+            <% (customers || []).forEach((cust) => { %>
+              <option value="<%= cust.id %>">
+                #<%= cust.id %> — <%= cust.name %><%= cust.phone ? ' (' + cust.phone + ')' : '' %>
+              </option>
+            <% }) %>
+          </select>
+        </label>
+        <button type="button" id="open-customer-modal" title="Add New Customer">+ Add Customer</button>
+      </div>
       <div id="line-items">
         <div class="row line-item">
           <label>
@@ -132,6 +133,7 @@
       <thead>
         <tr>
           <th>ID</th>
+          <th>Customer</th>
           <th>Status</th>
           <th>Total</th>
           <th>Items</th>
@@ -144,7 +146,7 @@
       </thead>
       <tbody>
         <% if (!orders || orders.length === 0) { %>
-          <tr><td colspan="9">No orders yet.</td></tr>
+          <tr><td colspan="10">No orders yet.</td></tr>
         <% } else { %>
           <% orders.forEach((order) => { %>
             <%
@@ -161,6 +163,19 @@
             %>
             <tr>
               <td><strong>#<%= order.id %></strong></td>
+              <td>
+                <% if (order.customer_name) { %>
+                  <strong><%= order.customer_name %></strong>
+                  <% if (order.customer_phone) { %>
+                    <span class="cust-sub"><%= order.customer_phone %></span>
+                  <% } %>
+                  <% if (order.customer_extra_details) { %>
+                    <span class="cust-sub"><%= order.customer_extra_details %></span>
+                  <% } %>
+                <% } else { %>
+                  <span class="muted-dash">Walk-in Guest</span>
+                <% } %>
+              </td>
               <td>
                 <span class="badge badge-<%= st %>"><%= st %></span>
                 <% if (st === "COMPLETED" && order.payment_method) { %>
@@ -180,6 +195,7 @@
                 </time>
               </td>
               <td class="actions-cell">
+                <a class="btn-link" href="/orders/<%= order.id %>/invoice" target="_blank" rel="noopener">Invoice</a>
                 <% if (canEdit) { %>
                   <button
                     type="button"
@@ -222,9 +238,6 @@
                   >
                     Cancel &amp; Restock
                   </button>
-                <% } %>
-                <% if (!canEdit && !nextStatus && !canCancel) { %>
-                  <span class="muted-dash">—</span>
                 <% } %>
 
                 <% if (st !== "COMPLETED" && st !== "CANCELLED") { %>
@@ -271,45 +284,45 @@
     </table>
   </section>
 
-<div id="customer-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; z-index:1000;">
-  <div style="background:#fff; border-radius:8px; padding:1.25rem 1.5rem; width:100%; max-width:460px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
-      <h3 style="margin:0;">Add Customer Details</h3>
-      <button type="button" id="close-customer-modal">&times;</button>
+  <div id="customer-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; z-index:1000;">
+    <div style="background:#fff; border-radius:8px; padding:1.25rem 1.5rem; width:100%; max-width:460px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <h3 style="margin:0;">Add Customer Details</h3>
+        <button type="button" id="close-customer-modal">&times;</button>
+      </div>
+      <form id="add-customer-form">
+        <div style="margin-bottom:0.6rem;">
+          <label style="display:block; font-weight:600;">Customer Name *</label>
+          <input type="text" id="cust-name" name="name" required placeholder="Full name" style="width:100%; box-sizing:border-box;" />
+        </div>
+        <div style="margin-bottom:0.6rem;">
+          <label style="display:block;">Phone Number</label>
+          <input type="text" id="cust-phone" name="phone" placeholder="e.g. 9876543210" style="width:100%; box-sizing:border-box;" />
+        </div>
+        <div style="margin-bottom:0.6rem;">
+          <label style="display:block;">Email</label>
+          <input type="email" id="cust-email" name="email" placeholder="customer@example.com" style="width:100%; box-sizing:border-box;" />
+        </div>
+        <div style="margin-bottom:0.6rem;">
+          <label style="display:block;">Address Line 1</label>
+          <input type="text" id="cust-addr1" name="addressLine1" placeholder="House / Street / Building" style="width:100%; box-sizing:border-box;" />
+        </div>
+        <div style="margin-bottom:0.6rem;">
+          <label style="display:block;">Address Line 2</label>
+          <input type="text" id="cust-addr2" name="addressLine2" placeholder="Area / Landmark / City" style="width:100%; box-sizing:border-box;" />
+        </div>
+        <div style="margin-bottom:0.8rem;">
+          <label style="display:block;">Extra Details (Profession / Notes)</label>
+          <textarea id="cust-extra" name="extraDetails" rows="2" placeholder="e.g. Doctor, Company GST, Billing note" style="width:100%; box-sizing:border-box; padding:0.45rem; border-radius:6px; border:1px solid #9ca3af;"></textarea>
+        </div>
+        <div id="customer-modal-feedback" style="margin-bottom:0.6rem;"></div>
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+          <button type="button" id="cancel-customer-modal">Cancel</button>
+          <button type="submit" class="btn-primary">Save Customer</button>
+        </div>
+      </form>
     </div>
-    <form id="add-customer-form">
-      <div style="margin-bottom:0.6rem;">
-        <label style="display:block; font-weight:600;">Customer Name *</label>
-        <input type="text" id="cust-name" name="name" required placeholder="Full name" style="width:100%; box-sizing:border-box;" />
-      </div>
-      <div style="margin-bottom:0.6rem;">
-        <label style="display:block;">Phone Number</label>
-        <input type="text" id="cust-phone" name="phone" placeholder="e.g. 9876543210" style="width:100%; box-sizing:border-box;" />
-      </div>
-      <div style="margin-bottom:0.6rem;">
-        <label style="display:block;">Email</label>
-        <input type="email" id="cust-email" name="email" placeholder="customer@example.com" style="width:100%; box-sizing:border-box;" />
-      </div>
-      <div style="margin-bottom:0.6rem;">
-        <label style="display:block;">Address Line 1</label>
-        <input type="text" id="cust-addr1" name="addressLine1" placeholder="House / Street / Building" style="width:100%; box-sizing:border-box;" />
-      </div>
-      <div style="margin-bottom:0.6rem;">
-        <label style="display:block;">Address Line 2</label>
-        <input type="text" id="cust-addr2" name="addressLine2" placeholder="Area / Landmark / City" style="width:100%; box-sizing:border-box;" />
-      </div>
-      <div style="margin-bottom:0.8rem;">
-        <label style="display:block;">Extra Details (Profession / Notes)</label>
-        <textarea id="cust-extra" name="extraDetails" rows="2" placeholder="e.g. Doctor, Company GST, Billing note" style="width:100%; box-sizing:border-box; padding:0.45rem; border-radius:6px; border:1px solid #9ca3af;"></textarea>
-      </div>
-      <div id="customer-modal-feedback" style="margin-bottom:0.6rem;"></div>
-      <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
-        <button type="button" id="cancel-customer-modal">Cancel</button>
-        <button type="submit" class="btn-primary">Save Customer</button>
-      </div>
-    </form>
   </div>
-</div>
 
   <script id="pos-orders-data" type="application/json"><%- JSON.stringify({
     orders: orders || [],
@@ -341,66 +354,55 @@
     const editEstimatedTotalEl = document.getElementById("edit-estimated-total");
     const editReasonInput = document.getElementById("edit-reason");
 
-   const customerSelect = document.getElementById("customer-select");
-const customerModal = document.getElementById("customer-modal");
-const addCustomerForm = document.getElementById("add-customer-form");
-const customerModalFeedback = document.getElementById("customer-modal-feedback");
+    const customerSelect = document.getElementById("customer-select");
+    const customerModal = document.getElementById("customer-modal");
+    const addCustomerForm = document.getElementById("add-customer-form");
+    const customerModalFeedback = document.getElementById("customer-modal-feedback");
 
-function openCustomerModal() {
-  customerModalFeedback.innerHTML = "";
-  addCustomerForm.reset();
-  customerModal.style.display = "flex";
-  document.getElementById("cust-name").focus();
-}
-
-function closeCustomerModal() {
-  customerModal.style.display = "none";
-}
-
-document.getElementById("open-customer-modal").addEventListener("click", openCustomerModal);
-document.getElementById("close-customer-modal").addEventListener("click", closeCustomerModal);
-document.getElementById("cancel-customer-modal").addEventListener("click", closeCustomerModal);
-
-addCustomerForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  customerModalFeedback.innerHTML = "";
-
-  const payload = {
-    name: document.getElementById("cust-name").value,
-    phone: document.getElementById("cust-phone").value,
-    email: document.getElementById("cust-email").value,
-    addressLine1: document.getElementById("cust-addr1").value,
-    addressLine2: document.getElementById("cust-addr2").value,
-    extraDetails: document.getElementById("cust-extra").value,
-  };
-
-  try {
-    const res = await fetch("/customers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      customerModalFeedback.innerHTML = `<div class="msg-err">${data.error || "Failed to save customer."}</div>`;
-      return;
+    function openCustomerModal() {
+      customerModalFeedback.innerHTML = "";
+      addCustomerForm.reset();
+      customerModal.style.display = "flex";
+      document.getElementById("cust-name").focus();
     }
 
-    const c = data.customer;
-    const opt = document.createElement("option");
-    opt.value = c.id;
-    opt.textContent = `#${c.id} — ${c.name}${c.phone ? " (" + c.phone + ")" : ""}`;
-    customerSelect.appendChild(opt);
-    customerSelect.value = String(c.id);
-    closeCustomerModal();
-  } catch (err) {
-    customerModalFeedback.innerHTML = `<div class="msg-err">Network error saving customer.</div>`;
-  }
-});
+    function closeCustomerModal() {
+      customerModal.style.display = "none";
+    }
 
-// In your existing punch-order-form submit handler, include customerId in the POST /orders body:
-// const customerId = customerSelect.value ? Number(customerSelect.value) : null;
-// body: JSON.stringify({ idempotencyKey: currentIdempotencyKey, customerId, items })
+    document.getElementById("open-customer-modal").addEventListener("click", openCustomerModal);
+    document.getElementById("close-customer-modal").addEventListener("click", closeCustomerModal);
+    document.getElementById("cancel-customer-modal").addEventListener("click", closeCustomerModal);
+
+    addCustomerForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      customerModalFeedback.innerHTML = "";
+
+      const payload = {
+        name: document.getElementById("cust-name").value,
+        phone: document.getElementById("cust-phone").value,
+        email: document.getElementById("cust-email").value,
+        addressLine1: document.getElementById("cust-addr1").value,
+        addressLine2: document.getElementById("cust-addr2").value,
+        extraDetails: document.getElementById("cust-extra").value,
+      };
+
+      try {
+        const res = await fetch("/customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          customerModalFeedback.innerHTML = `<div class="msg-err">${data.error \vert{}\vert{} "Failed to save customer."}</div>`; return; }  const c = data.customer; const opt = document.createElement("option"); opt.value = c.id; opt.textContent = `#${c.id} — ${c.name}${c.phone ? " (" + c.phone + ")" : ""}`;
+        customerSelect.appendChild(opt);
+        customerSelect.value = String(c.id);
+        closeCustomerModal();
+      } catch (err) {
+        customerModalFeedback.innerHTML = `<div class="msg-err">Network error saving customer.</div>`;
+      }
+    });
 
     function createKey() {
       if (window.crypto && typeof window.crypto.randomUUID === "function") {
@@ -474,7 +476,7 @@ addCustomerForm.addEventListener("submit", async (e) => {
       }));
 
       const customerId =
-            customerSelect && customerSelect.value ? Number(customerSelect.value) : null;
+        customerSelect && customerSelect.value ? Number(customerSelect.value) : null;
 
       const bodyPayload = {
         idempotencyKey: currentIdempotencyKey,
@@ -500,16 +502,9 @@ addCustomerForm.addEventListener("submit", async (e) => {
         const data = await res.json();
 
         if (!res.ok) {
-          feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Order failed."}</div>`;
-          return;
-        }
-
-        currentIdempotencyKey = createKey();
-        const paidTag =
-          data.order.payment_status === "PAID"
-            ? ` · PAID (${data.order.payment_method})`
+          feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error \vert{}\vert{} "Order failed."}</div>`; return; }  currentIdempotencyKey = createKey(); const paidTag = data.order.payment_status === "PAID" ? ` · PAID (${data.order.payment_method})`
             : "";
-        feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} created (${data.order.status}${paidTag}) — Total: $${Number(data.order.total_amount).toFixed(2)}</div>`;
+        feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} created (${data.order.status}${paidTag}) — Total:$${Number(data.order.total_amount).toFixed(2)}</div>`;
         form.reset();
         recalcSubtotal();
         setTimeout(() => {
@@ -539,7 +534,7 @@ addCustomerForm.addEventListener("submit", async (e) => {
       for (const cat of CATALOG_DATA) {
         const sel = Number(cat.id) === Number(selectedItemId) ? "selected" : "";
         options.push(
-          `<option value="${cat.id}" data-price="${Number(cat.price)}" ${sel}>#${cat.id} — ${cat.name} ($${Number(cat.price).toFixed(2)} | Stock: ${cat.stock_count})</option>`
+          `<option value="${cat.id}" data-price="${Number(cat.price)}" ${sel}>#${cat.id} — ${cat.name} ($${Number(cat.price).toFixed(2)} \vert{} Stock:${cat.stock_count})</option>`
         );
       }
 
@@ -581,60 +576,7 @@ addCustomerForm.addEventListener("submit", async (e) => {
         if (!targetOrder) return;
 
         editOrderIdInput.value = String(orderId);
-        editTitle.textContent = `#${orderId} (${targetOrder.status})`;
-        editReasonInput.value = "";
-        editLineItemsContainer.innerHTML = "";
-
-        const lines = Array.isArray(targetOrder.items) && targetOrder.items.length > 0
-          ? targetOrder.items
-          : [{}];
-
-        for (const line of lines) {
-          editLineItemsContainer.appendChild(buildEditRow(line.item_id ?? "", line.quantity ?? 1));
-        }
-
-        recalcEditSubtotal();
-        editPanel.style.display = "block";
-        editPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      });
-    });
-
-    editAddRowBtn.addEventListener("click", () => {
-      editLineItemsContainer.appendChild(buildEditRow("", 1));
-      recalcEditSubtotal();
-    });
-
-    cancelEditBtn.addEventListener("click", () => {
-      editPanel.style.display = "none";
-      editLineItemsContainer.innerHTML = "";
-    });
-
-    editLineItemsContainer.addEventListener("input", recalcEditSubtotal);
-    editLineItemsContainer.addEventListener("change", recalcEditSubtotal);
-    editLineItemsContainer.addEventListener("click", (e) => {
-      if (e.target.classList.contains("edit-remove-row")) {
-        const rows = editLineItemsContainer.querySelectorAll(".edit-line-item");
-        if (rows.length > 1) {
-          e.target.closest(".edit-line-item").remove();
-          recalcEditSubtotal();
-        }
-      }
-    });
-
-    editForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      feedback.innerHTML = "";
-
-      const orderId = editOrderIdInput.value;
-      const items = Array.from(editLineItemsContainer.querySelectorAll(".edit-line-item")).map((row) => ({
-        itemId: Number(row.querySelector(".edit-item-select").value),
-        quantity: Number(row.querySelector(".edit-qty-input").value),
-      }));
-
-      const reason = editReasonInput.value.trim();
-
-      try {
-        const res = await fetch(`/orders/${orderId}/items`, {
+        editTitle.textContent = `#${orderId} (${targetOrder.status})`; editReasonInput.value = ""; editLineItemsContainer.innerHTML = "";  const lines = Array.isArray(targetOrder.items) && targetOrder.items.length > 0 ? targetOrder.items : [{}];  for (const line of lines) { editLineItemsContainer.appendChild(buildEditRow(line.item_id ?? "", line.quantity ?? 1)); }  recalcEditSubtotal(); editPanel.style.display = "block"; editPanel.scrollIntoView({ behavior: "smooth", block: "nearest" }); }); });  editAddRowBtn.addEventListener("click", () => { editLineItemsContainer.appendChild(buildEditRow("", 1)); recalcEditSubtotal(); });  cancelEditBtn.addEventListener("click", () => { editPanel.style.display = "none"; editLineItemsContainer.innerHTML = ""; });  editLineItemsContainer.addEventListener("input", recalcEditSubtotal); editLineItemsContainer.addEventListener("change", recalcEditSubtotal); editLineItemsContainer.addEventListener("click", (e) => { if (e.target.classList.contains("edit-remove-row")) { const rows = editLineItemsContainer.querySelectorAll(".edit-line-item"); if (rows.length > 1) { e.target.closest(".edit-line-item").remove(); recalcEditSubtotal(); } } });  editForm.addEventListener("submit", async (e) => { e.preventDefault(); feedback.innerHTML = "";  const orderId = editOrderIdInput.value; const items = Array.from(editLineItemsContainer.querySelectorAll(".edit-line-item")).map((row) => ({ itemId: Number(row.querySelector(".edit-item-select").value), quantity: Number(row.querySelector(".edit-qty-input").value), }));  const reason = editReasonInput.value.trim();  try { const res = await fetch(`/orders/${orderId}/items`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -649,11 +591,11 @@ addCustomerForm.addEventListener("submit", async (e) => {
         const data = await res.json();
 
         if (!res.ok) {
-          feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Failed to edit order."}</div>`;
+          feedback.innerHTML = `<div class="msg-err"><strong>${data.code \vert{}\vert{} "Error"}:</strong> ${data.error || "Failed to edit order."}</div>`;
           return;
         }
 
-        feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} updated — New Total: $${Number(data.order.total_amount).toFixed(2)}.</div>`;
+        feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} updated — New Total:$${Number(data.order.total_amount).toFixed(2)}.</div>`;
         setTimeout(() => {
           window.location.href = "/orders?_=" + Date.now();
         }, 350);
@@ -697,14 +639,7 @@ addCustomerForm.addEventListener("submit", async (e) => {
           const data = await res.json();
 
           if (!res.ok) {
-            feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Status update failed."}</div>`;
-            btn.disabled = false;
-            return;
-          }
-
-          const restockNote =
-            Array.isArray(data.restoredItems) && data.restoredItems.length > 0
-              ? ` (Restocked ${data.restoredItems.length} item line(s))`
+            feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error \vert{}\vert{} "Status update failed."}</div>`; btn.disabled = false; return; }  const restockNote = Array.isArray(data.restoredItems) && data.restoredItems.length > 0 ? ` (Restocked ${data.restoredItems.length} item line(s))`
               : "";
           const paidNote =
             nextStatus === "COMPLETED" && data.order?.payment_method

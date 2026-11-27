@@ -255,7 +255,26 @@ async function postReconcilePayment(req, res, next) {
     return next(err);
   }
 }
+async function getOrderInvoice(req, res, next) {
+  try {
+    const orderId = Number(req.params.id);
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+      return res.status(400).send("Invalid order ID.");
+    }
 
+    const invoiceData = await getOrderInvoiceById(orderId);
+    if (!invoiceData) {
+      return res.status(404).send(`Order #${orderId} not found.`);
+    }
+
+    return res.render("orders/invoice", {
+      order: invoiceData.order,
+      items: invoiceData.items,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
 module.exports = {
   punchOrder,
   getOrders,
@@ -264,4 +283,5 @@ module.exports = {
   editOrder,
   createPaymentIntent,
   postReconcilePayment,
+  getOrderInvoice,
 };

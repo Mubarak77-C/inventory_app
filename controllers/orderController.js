@@ -68,12 +68,19 @@ async function punchOrder(req, res, next) {
       req.session?.userId ?? req.session?.user?.id ?? req.user?.id ?? null;
     const customerId = req.body?.customerId ?? req.body?.customer_id ?? null;
     const orderContext = normalizeOrderContext(req.body);
+
     if (orderContext.orderType === "WALK_IN" && !orderContext.tableNumber) {
       return res.status(400).json({
         code: "TABLE_NUMBER_REQUIRED",
         error: "Table number is required for Walk-in orders.",
       });
     }
+
+    const discountType =
+      req.body?.discountType ?? req.body?.discount_type ?? null;
+    const discountValue =
+      req.body?.discountValue ?? req.body?.discount_value ?? 0;
+
     const result = await createOrder({
       idempotencyKey,
       items,
@@ -86,6 +93,8 @@ async function punchOrder(req, res, next) {
       orderType: orderContext.orderType,
       tableNumber: orderContext.tableNumber,
       orderChannel: orderContext.orderChannel,
+      discountType,
+      discountValue,
     });
 
     const httpStatus = result.idempotentReplay ? 200 : 201;

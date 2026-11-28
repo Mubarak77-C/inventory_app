@@ -129,6 +129,8 @@ async function createOrder({
   orderType = "WALK_IN",
   tableNumber = null,
   orderChannel = null,
+  discountType = null,
+  discountValue = 0,
 }) {
   if (
     typeof idempotencyKey !== "string" ||
@@ -211,6 +213,19 @@ async function createOrder({
 
   const cleanKey = idempotencyKey.trim();
   const requestedItems = normalizeAndAggregateItems(items);
+  const itemDiscountMap = new Map();
+  if (Array.isArray(items)) {
+    for (const rawItem of items) {
+      const idNum = Number(rawItem?.itemId ?? rawItem?.item_id);
+      if (Number.isInteger(idNum) && idNum > 0) {
+        itemDiscountMap.set(idNum, {
+          discountType: rawItem?.discountType ?? rawItem?.discount_type ?? null,
+          discountValue: rawItem?.discountValue ?? rawItem?.discount_value ?? 0,
+        });
+      }
+    }
+  }
+
   const actorId =
     Number.isInteger(Number(createdBy)) && Number(createdBy) > 0
       ? Number(createdBy)
@@ -221,14 +236,12 @@ async function createOrder({
   try {
     await client.query("BEGIN");
 
-    // 1. Idempotency check before touching customer or stock
     const existing = await getOrderWithItemsByIdempotencyKey(client, cleanKey);
     if (existing) {
       await client.query("COMMIT");
       return { ...existing, idempotentReplay: true };
     }
 
-    // 1b. Validate optional customerId (null/empty = walk-in order)
     let resolvedCustomerId = null;
     if (
       customerId !== undefined &&
@@ -258,16 +271,13 @@ async function createOrder({
       resolvedCustomerId = parsedCustomerId;
     }
 
-    // 2. Atomically deduct stock for each requested item
-    const lineSnapshots = [];
-    let totalAmount = 0;
-
+    const rawLines = [];
     for (const reqItem of requestedItems) {
       const updateRes = await client.query(
         `UPDATE public.items
          SET stock_count = stock_count - $1
          WHERE id = $2 AND stock_count >= $1
-         RETURNING id, name, price, stock_count`,
+         RETURNING id, name, price, stock_count, is_weekend_special, weekend_discount_pct`,
         [reqItem.quantity, reqItem.itemId],
       );
 
@@ -301,26 +311,36 @@ async function createOrder({
       }
 
       const dbItem = updateRes.rows[0];
-      const unitPrice = Number(dbItem.price);
-      const lineTotal = Number((unitPrice * reqItem.quantity).toFixed(2));
-      totalAmount = Number((totalAmount + lineTotal).toFixed(2));
-
-      lineSnapshots.push({
+      const lineDisc = itemDiscountMap.get(dbItem.id) || {};
+      rawLines.push({
         itemId: dbItem.id,
         itemName: dbItem.name,
         unitPrice: dbItem.price,
         quantity: reqItem.quantity,
-        lineTotal: lineTotal.toFixed(2),
+        isWeekendSpecial: Boolean(dbItem.is_weekend_special),
+        weekendDiscountPct: Number(dbItem.weekend_discount_pct || 0),
+        discountType: lineDisc.discountType,
+        discountValue: lineDisc.discountValue,
       });
     }
 
-    // 3. Insert order header (with PAID fields, optional customer_id, and order type/table/channel)
+    const pricing = calculateOrderPricing({
+      rawLines,
+      orderDiscountType: discountType,
+      orderDiscountValue: discountValue,
+      now: new Date(),
+    });
+
     const isPaid = normalizedStatus === "COMPLETED";
     const orderInsertRes = await client.query(
       `INSERT INTO public.orders (
          idempotency_key,
          status,
          total_amount,
+         subtotal_amount,
+         discount_type,
+         discount_value,
+         discount_amount,
          payment_method,
          payment_status,
          payment_reference,
@@ -331,12 +351,16 @@ async function createOrder({
          table_number,
          order_channel
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING *`,
       [
         cleanKey,
         normalizedStatus,
-        totalAmount.toFixed(2),
+        pricing.totalAmount,
+        pricing.subtotalAmount,
+        pricing.discountType,
+        pricing.discountValue,
+        pricing.discountAmount,
         isPaid ? normalizedPaymentMethod : null,
         isPaid ? "PAID" : "UNPAID",
         isPaid ? cleanPaymentReference : null,
@@ -350,7 +374,6 @@ async function createOrder({
     );
     const createdOrder = orderInsertRes.rows[0];
 
-    // 4. Log initial order creation in audit history
     const initialReason = isPaid
       ? `Quick paid via ${normalizedPaymentMethod}`
       : "Order punched";
@@ -362,13 +385,23 @@ async function createOrder({
       [createdOrder.id, normalizedStatus, actorId, initialReason],
     );
 
-    // 5. Insert order_items snapshot rows
     const insertedItems = [];
-    for (const snap of lineSnapshots) {
+    for (const snap of pricing.lines) {
       const itemInsertRes = await client.query(
         `INSERT INTO public.order_items
-           (order_id, item_id, item_name, unit_price, quantity, line_total)
-         VALUES ($1, $2, $3, $4, $5, $6)
+           (
+             order_id,
+             item_id,
+             item_name,
+             unit_price,
+             quantity,
+             line_total,
+             discount_type,
+             discount_value,
+             discount_amount,
+             taxable_amount
+           )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING *`,
         [
           createdOrder.id,
@@ -377,6 +410,10 @@ async function createOrder({
           snap.unitPrice,
           snap.quantity,
           snap.lineTotal,
+          snap.discountType,
+          snap.discountValue,
+          snap.totalLineDiscount,
+          snap.taxableAmount,
         ],
       );
       insertedItems.push(itemInsertRes.rows[0]);
@@ -948,6 +985,177 @@ async function getOrderInvoiceById(orderId) {
     items: itemsRes.rows,
   };
 }
+
+function isWeekendDate(date = new Date()) {
+  const day = date.getDay(); // 0 = Sunday, 6 = Saturday
+  return day === 0 || day === 6;
+}
+
+function normalizeDiscountInput(typeVal, valueVal) {
+  const cleanType =
+    typeof typeVal === "string" ? typeVal.trim().toUpperCase() : "NONE";
+  if (!["FIXED", "PERCENT"].includes(cleanType)) {
+    return { discountType: null, discountValue: 0 };
+  }
+  const numVal = Number(valueVal);
+  if (!Number.isFinite(numVal) || numVal <= 0) {
+    return { discountType: null, discountValue: 0 };
+  }
+  if (cleanType === "PERCENT" && numVal > 100) {
+    throw createDomainError(
+      "Percentage discount cannot exceed 100%.",
+      "INVALID_DISCOUNT_PERCENT",
+      400,
+    );
+  }
+  return {
+    discountType: cleanType,
+    discountValue: Number(numVal.toFixed(2)),
+  };
+}
+
+function calculateOrderPricing({
+  rawLines,
+  orderDiscountType = null,
+  orderDiscountValue = 0,
+  now = new Date(),
+}) {
+  const weekendActive = isWeekendDate(now);
+  let grossSubtotal = 0;
+  let itemDiscountTotal = 0;
+
+  const pricedLines = rawLines.map((line) => {
+    const unitPrice = Number(line.unitPrice);
+    const quantity = Number(line.quantity);
+    const lineGross = Number((unitPrice * quantity).toFixed(2));
+    grossSubtotal = Number((grossSubtotal + lineGross).toFixed(2));
+
+    const manualItem = normalizeDiscountInput(
+      line.discountType,
+      line.discountValue,
+    );
+
+    let itemDiscount = 0;
+    let appliedSource = "NONE";
+    let finalType = manualItem.discountType;
+    let finalValue = manualItem.discountValue;
+
+    if (manualItem.discountType === "FIXED") {
+      itemDiscount = Math.min(lineGross, manualItem.discountValue);
+      appliedSource = "MANUAL_FIXED";
+    } else if (manualItem.discountType === "PERCENT") {
+      itemDiscount = Number(
+        ((lineGross * manualItem.discountValue) / 100).toFixed(2),
+      );
+      appliedSource = "MANUAL_PERCENT";
+    } else if (
+      weekendActive &&
+      line.isWeekendSpecial &&
+      Number(line.weekendDiscountPct) > 0
+    ) {
+      const pct = Math.min(100, Number(line.weekendDiscountPct));
+      itemDiscount = Number(((lineGross * pct) / 100).toFixed(2));
+      finalType = "PERCENT";
+      finalValue = pct;
+      appliedSource = "WEEKEND_SPECIAL";
+    }
+
+    itemDiscount = Number(Math.min(lineGross, itemDiscount).toFixed(2));
+    const afterItemDiscount = Number(
+      Math.max(0, lineGross - itemDiscount).toFixed(2),
+    );
+    itemDiscountTotal = Number((itemDiscountTotal + itemDiscount).toFixed(2));
+
+    return {
+      ...line,
+      lineGross,
+      discountType: finalType,
+      discountValue: finalValue,
+      discountAmount: itemDiscount,
+      discountSource: appliedSource,
+      afterItemDiscount,
+    };
+  });
+
+  const afterItemsSubtotal = Number(
+    pricedLines.reduce((sum, l) => sum + l.afterItemDiscount, 0).toFixed(2),
+  );
+
+  const orderDisc = normalizeDiscountInput(
+    orderDiscountType,
+    orderDiscountValue,
+  );
+  let orderDiscountAmount = 0;
+  if (orderDisc.discountType === "FIXED") {
+    orderDiscountAmount = Math.min(afterItemsSubtotal, orderDisc.discountValue);
+  } else if (orderDisc.discountType === "PERCENT") {
+    orderDiscountAmount = Number(
+      ((afterItemsSubtotal * orderDisc.discountValue) / 100).toFixed(2),
+    );
+  }
+  orderDiscountAmount = Number(
+    Math.min(afterItemsSubtotal, orderDiscountAmount).toFixed(2),
+  );
+
+  // Allocate order-level discount proportionally across lines so each line has exact taxable_amount
+  let allocatedOrderDiscount = 0;
+  const finalLines = pricedLines.map((line, idx) => {
+    let lineOrderShare = 0;
+    if (orderDiscountAmount > 0 && afterItemsSubtotal > 0) {
+      if (idx === pricedLines.length - 1) {
+        lineOrderShare = Number(
+          Math.max(0, orderDiscountAmount - allocatedOrderDiscount).toFixed(2),
+        );
+      } else {
+        lineOrderShare = Number(
+          (
+            (line.afterItemDiscount / afterItemsSubtotal) *
+            orderDiscountAmount
+          ).toFixed(2),
+        );
+        lineOrderShare = Math.min(line.afterItemDiscount, lineOrderShare);
+      }
+    }
+    allocatedOrderDiscount = Number(
+      (allocatedOrderDiscount + lineOrderShare).toFixed(2),
+    );
+
+    const totalLineDiscount = Number(
+      (line.discountAmount + lineOrderShare).toFixed(2),
+    );
+    const taxableAmount = Number(
+      Math.max(0, line.lineGross - totalLineDiscount).toFixed(2),
+    );
+    const finalLineTotal = taxableAmount; // GST added in Phase 3
+
+    return {
+      ...line,
+      lineOrderDiscount: lineOrderShare,
+      totalLineDiscount,
+      taxableAmount,
+      lineTotal: finalLineTotal.toFixed(2),
+    };
+  });
+
+  const totalDiscountAmount = Number(
+    (itemDiscountTotal + orderDiscountAmount).toFixed(2),
+  );
+  const netBeforeTax = Number(
+    Math.max(0, grossSubtotal - totalDiscountAmount).toFixed(2),
+  );
+
+  return {
+    weekendActive,
+    grossSubtotal: grossSubtotal.toFixed(2),
+    discountType: orderDisc.discountType,
+    discountValue: orderDisc.discountValue,
+    discountAmount: totalDiscountAmount.toFixed(2),
+    orderDiscountAmount: orderDiscountAmount.toFixed(2),
+    subtotalAmount: netBeforeTax.toFixed(2),
+    totalAmount: netBeforeTax.toFixed(2),
+    lines: finalLines,
+  };
+}
 module.exports = {
   createOrder,
   getOrderWithItemsByIdempotencyKey,
@@ -955,4 +1163,6 @@ module.exports = {
   transitionOrderStatus,
   editOrderItems,
   getOrderInvoiceById,
+  normalizeDiscountInput,
+  calculateOrderPricing,
 };

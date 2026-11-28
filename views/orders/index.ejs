@@ -83,32 +83,77 @@
         </label>
       </div>
 
-      <div id="line-items">
+ <div id="line-items">
         <div class="row line-item">
           <label>
             Item:
             <select name="itemId" class="item-select" required>
-              <option value="" data-price="0" data-stock="0">-- Select an item --</option>
+              <option value="" data-price="0" data-stock="0" data-weekend="0" data-weekend-pct="0">-- Select an item --</option>
               <% (catalogItems || []).filter((item) => Number(item.stock_count) > 0).forEach((item) => { %>
                 <option
                   value="<%= item.id %>"
                   data-price="<%= Number(item.price) %>"
                   data-stock="<%= Number(item.stock_count) %>"
+                  data-weekend="<%= item.is_weekend_special ? 1 : 0 %>"
+                  data-weekend-pct="<%= Number(item.weekend_discount_pct || 0) %>"
                 >
-                  #<%= item.id %> — <%= item.name %> ($<%= Number(item.price).toFixed(2) %> | Stock: <%= item.stock_count %>)
+                  #<%= item.id %> — <%= item.name %> ($<%= Number(item.price).toFixed(2) %> | Stock: <%= item.stock_count %><%= item.is_weekend_special && Number(item.weekend_discount_pct) > 0 ? ' | Weekend ' + Number(item.weekend_discount_pct) + '% off' : '' %>)
                 </option>
               <% }) %>
             </select>
           </label>
           <label>
             Qty:
-            <input type="number" name="quantity" class="qty-input" min="1" value="1" required style="width: 78px;" />
+            <input type="number" name="quantity" class="qty-input" min="1" value="1" required style="width: 72px;" />
           </label>
-          <span class="line-preview" style="min-width: 90px; font-weight: 600;">$0.00</span>
+          <label>
+            Item Disc:
+            <select name="itemDiscountType" class="item-disc-type">
+              <option value="NONE">None</option>
+              <option value="FIXED">Fixed ($)</option>
+              <option value="PERCENT">Percent (%)</option>
+            </select>
+          </label>
+          <label>
+            Value:
+            <input type="number" name="itemDiscountValue" class="item-disc-val" min="0" step="0.01" value="0" style="width: 82px;" />
+          </label>
+          <span class="line-preview" style="min-width: 110px; font-weight: 600;">$0.00</span>
           <button type="button" class="remove-row">Remove</button>
         </div>
       </div>
 
+      <div class="row" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #d1d5db;">
+        <label for="order-discount-type">
+          <strong>All-Items Discount:</strong>
+          <select id="order-discount-type" name="discountType">
+            <option value="NONE">None</option>
+            <option value="FIXED">Fixed Amount ($)</option>
+            <option value="PERCENT">Percentage (%)</option>
+          </select>
+        </label>
+        <label for="order-discount-value">
+          <strong>Discount Value:</strong>
+          <input type="number" id="order-discount-value" name="discountValue" min="0" step="0.01" value="0" style="width: 95px;" />
+        </label>
+        <span id="weekend-badge" class="cust-sub" style="margin-top: 0; font-weight: 600; color: #065f46;"></span>
+      </div>
+
+      <div class="row" style="justify-content: space-between; margin-top: 0.9rem;">
+        <div class="row" style="margin-bottom: 0;">
+          <button type="button" id="add-row">+ Add Line Item</button>
+          <button type="submit" id="punch-order-btn" class="btn-primary">Punch Order</button>
+          <select id="quick-payment-method" aria-label="Quick payment method">
+            <option value="CASH">CASH</option>
+            <option value="CARD">CARD</option>
+            <option value="UPI">UPI</option>
+          </select>
+          <button type="button" id="quick-pay-btn" class="btn-primary">Quick Payment</button>
+        </div>
+        <div>
+          Discount: <strong id="estimated-discount">$0.00</strong> · Net Subtotal: <strong id="estimated-total">$0.00</strong>
+        </div>
+      </div>
       <div class="row" style="justify-content: space-between; margin-top: 0.9rem;">
         <div class="row" style="margin-bottom: 0;">
           <button type="button" id="add-row">+ Add Line Item</button>
@@ -398,6 +443,11 @@
     const onlineChannelField = document.getElementById("online-channel-field");
     const onlineChannelSelect = document.getElementById("online-channel-select");
 
+    const orderDiscountTypeEl = document.getElementById("order-discount-type");
+    const orderDiscountValueEl = document.getElementById("order-discount-value");
+    const estimatedDiscountEl = document.getElementById("estimated-discount");
+    const weekendBadgeEl = document.getElementById("weekend-badge");
+
     function syncOrderTypeFields() {
       const selectedType = orderTypeSelect ? orderTypeSelect.value : "WALK_IN";
       const isWalkIn = selectedType === "WALK_IN";
@@ -484,22 +534,72 @@
 
     let currentIdempotencyKey = createKey();
 
+    const isWeekendNow = [0, 6].includes(new Date().getDay());
+    if (weekendBadgeEl) {
+      weekendBadgeEl.textContent = isWeekendNow
+        ? "Weekend Special Active: Flagged items auto-discounted on Sat/Sun unless overridden"
+        : "Weekday mode: Weekend special auto-discount activates on Sat & Sun";
+    }
+
+    function computeLineDisc(gross, type, val) {
+      const cleanType = String(type || "NONE").toUpperCase();
+      const num = Math.max(0, Number(val || 0));
+      if (!num || gross <= 0) return 0;
+      if (cleanType === "FIXED") return Math.min(gross, num);
+      if (cleanType === "PERCENT") return Math.min(gross, (gross * Math.min(100, num)) / 100);
+      return 0;
+    }
+
+
     function recalcSubtotal() {
-      let total = 0;
+      let grossSum = 0;
+      let afterItemsSum = 0;
+
       lineItemsContainer.querySelectorAll(".line-item").forEach((row) => {
         const select = row.querySelector(".item-select");
         const qtyInput = row.querySelector(".qty-input");
+        const discTypeEl = row.querySelector(".item-disc-type");
+        const discValEl = row.querySelector(".item-disc-val");
         const preview = row.querySelector(".line-preview");
+
         const option = select.options[select.selectedIndex];
         const price = option ? Number(option.dataset.price || 0) : 0;
+        const isWknd = option && option.dataset.weekend === "1";
+        const wkndPct = option ? Number(option.dataset.weekendPct || 0) : 0;
         const qty = Math.max(0, Number(qtyInput.value || 0));
-        const lineSum = price * qty;
-        total += lineSum;
-        preview.textContent = "$" + lineSum.toFixed(2);
-      });
-      estimatedTotalEl.textContent = "$" + total.toFixed(2);
-    }
+        const gross = price * qty;
 
+        let lineDisc = computeLineDisc(
+          gross,
+          discTypeEl ? discTypeEl.value : "NONE",
+          discValEl ? discValEl.value : 0,
+        );
+        if (lineDisc === 0 && isWeekendNow && isWknd && wkndPct > 0) {
+          lineDisc = computeLineDisc(gross, "PERCENT", wkndPct);
+        }
+
+        const netLine = Math.max(0, gross - lineDisc);
+        grossSum += gross;
+        afterItemsSum += netLine;
+        preview.textContent =
+          lineDisc > 0
+            ? `$${netLine.toFixed(2)} (-$${lineDisc.toFixed(2)})`
+            : `$${netLine.toFixed(2)}`;
+      });
+
+      const orderDisc = computeLineDisc(
+        afterItemsSum,
+        orderDiscountTypeEl ? orderDiscountTypeEl.value : "NONE",
+        orderDiscountValueEl ? orderDiscountValueEl.value : 0,
+      );
+      const totalDiscount = (grossSum - afterItemsSum) + orderDisc;
+      const netTotal = Math.max(0, afterItemsSum - orderDisc);
+
+      if (estimatedDiscountEl) {
+        estimatedDiscountEl.textContent = "$" + totalDiscount.toFixed(2);
+      }
+      estimatedTotalEl.textContent = "$" + netTotal.toFixed(2);
+    }
     function buildRowHtml() {
       const firstSelect = lineItemsContainer.querySelector(".item-select");
       const optionsHtml = firstSelect ? firstSelect.innerHTML : '<option value="">-- Select --</option>';
@@ -512,14 +612,28 @@
         </label>
         <label>
           Qty:
-          <input type="number" name="quantity" class="qty-input" min="1" value="1" required style="width: 78px;" />
+          <input type="number" name="quantity" class="qty-input" min="1" value="1" required style="width: 72px;" />
         </label>
-        <span class="line-preview" style="min-width: 90px; font-weight: 600;">$0.00</span>
+        <label>
+          Item Disc:
+          <select name="itemDiscountType" class="item-disc-type">
+            <option value="NONE">None</option>
+            <option value="FIXED">Fixed ($)</option>
+            <option value="PERCENT">Percent (%)</option>
+          </select>
+        </label>
+        <label>
+          Value:
+          <input type="number" name="itemDiscountValue" class="item-disc-val" min="0" step="0.01" value="0" style="width: 82px;" />
+        </label>
+        <span class="line-preview" style="min-width: 110px; font-weight: 600;">$0.00</span>
         <button type="button" class="remove-row">Remove</button>
       `;
       return div;
     }
 
+    if (orderDiscountTypeEl) orderDiscountTypeEl.addEventListener("change", recalcSubtotal);
+    if (orderDiscountValueEl) orderDiscountValueEl.addEventListener("input", recalcSubtotal);
     addRowBtn.addEventListener("click", () => {
       lineItemsContainer.appendChild(buildRowHtml());
       recalcSubtotal();
@@ -541,10 +655,15 @@
     async function submitOrder(targetStatus, paymentMethod = null) {
       feedback.innerHTML = "";
 
-      const items = Array.from(lineItemsContainer.querySelectorAll(".line-item")).map((row) => ({
+     const items = Array.from(lineItemsContainer.querySelectorAll(".line-item")).map((row) => ({
         itemId: Number(row.querySelector(".item-select").value),
         quantity: Number(row.querySelector(".qty-input").value),
+        discountType: row.querySelector(".item-disc-type")?.value || "NONE",
+        discountValue: Number(row.querySelector(".item-disc-val")?.value || 0),
       }));
+
+      const discountType = orderDiscountTypeEl ? orderDiscountTypeEl.value : "NONE";
+      const discountValue = orderDiscountValueEl ? Number(orderDiscountValueEl.value || 0) : 0;
 
       const customerId =
         customerSelect && customerSelect.value ? Number(customerSelect.value) : null;

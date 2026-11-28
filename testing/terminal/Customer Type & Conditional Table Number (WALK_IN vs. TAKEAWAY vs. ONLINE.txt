@@ -1,0 +1,91 @@
+docker exec -i inventory_postgres psql -U my_user -d inventory_db < db/migrations/010_order_type_table_discount_gst.sql
+
+              docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" | grep -iE "postgres|pg|db"
+for c in $(docker ps --format "{{.Names}}"); do
+  u=$(docker exec "$c" printenv POSTGRES_USER 2>/dev/null)
+grep -E "POSTGRES_|DATABASE_URL" .env 2>/dev/null || true
+inventory_postgres   pgvector/pgvector:pg15   Up 21 hours (healthy)
+CONTAINER=inventory_postgres  DB_USER=my_user  DB_NAME=inventory_db
+#DATABASE_URL=postgresql://my_user:psw@postgres:5432/inventory_db
+#above comment database url because using your real DB_PASSWORD and GEMINI_API_KEY, and removing or commenting out DATABASE_URL so docker-compose.yml controls it):
+
+docker exec -i inventory_postgres psql -U my_user -d inventory_db -c "
+SELECT
+  o.id,
+  o.order_type,
+  o.table_number,
+  o.order_channel,
+  o.customer_id,
+  c.name AS customer_name,
+  o.status,
+  o.payment_status,
+  o.payment_method,
+  o.total_amount,
+"IMIT 5; o.id DESCustomers c ON c.id = o.customer_id
+ id | order_type | table_number | order_channel | customer_id | customer_name |  status   | payment_status | payment_method | total_amount |          created_at           
+----+------------+--------------+---------------+-------------+---------------+-----------+----------------+----------------+--------------+-------------------------------
+ 47 | TAKEAWAY   |              |               |           3 | James         | PENDING   | UNPAID         |                |         2.00 | 2026-11-28 09:12:00.382343+00
+ 46 | ONLINE     |              | SWIGGY        |           4 | Delivery guy  | COMPLETED | PAID           | CASH           |        20.60 | 2026-11-28 09:03:58.211946+00
+ 45 | WALK_IN    | s            |               |             |               | PENDING   | UNPAID         |                |        20.60 | 2026-11-28 08:53:53.749994+00
+ 44 | TAKEAWAY   |              |               |           3 | James         | PENDING   | UNPAID         |                |        45.00 | 2026-11-28 08:52:13.860064+00
+ 43 | WALK_IN    | 2            |               |             |               | COMPLETED | PAID           | UPI            |        15.00 | 2026-11-28 08:51:21.016895+00
+(5 rows)
+
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ ^C
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -i inventory_postgres psql -U my_user -d inventory_db -c "
+SELECT
+  oi.order_id,
+  oi.id AS item_row_id,
+  oi.item_id,
+  oi.item_name,
+  oi.quantity,
+  oi.unit_price,
+  oi.line_total
+FROM public.order_items oi
+WHERE oi.order_id IN (
+  SELECT id FROM public.orders ORDER BY id DESC LIMIT 5
+)
+ORDER BY oi.order_id DESC, oi.id ASC;
+"
+ order_id | item_row_id | item_id |      item_name       | quantity | unit_price | line_total 
+----------+-------------+---------+----------------------+----------+------------+------------
+       47 |          65 |       6 | Flavored Iced Tea:   |        1 |       2.00 |       2.00
+       46 |          64 |      14 | Kunafa               |        1 |      20.60 |      20.60
+       45 |          63 |      14 | Kunafa               |        1 |      20.60 |      20.60
+       44 |          62 |      12 | Cold Brew Coffee Keg |        1 |      45.00 |      45.00
+       43 |          61 |       3 | Cocktail Shaker      |        1 |      15.00 |      15.00
+(5 rows)
+
+where this error resolved 
+docker restart inventory_node_app && docker logs --tail 20 inventory_node_app
+inventory_node_app
+    at async listOrders (/app/models/orderModel.js:378:20)
+    at async getOrders (/app/controllers/orderController.js:33:20) {
+  length: 111,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '504',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3665',
+  routine: 'errorMissingColumn'
+}
+
+some literal template issue so we fixes with just help of python3 command
+ython3 -c '
+p = "/home/ubuntu/js_code/the_odin_js/JS_Advance/nodejs/inventory-app/views/orders/index.ejs"
+s = open(p, encoding="utf-8").read()
+s = s.replace("\\vert{}\\vert{}", "||").replace("\\vert{}", "|")
+open(p, "w", encoding="utf-8").write(s)
+'
+grep -n 'vert{' /home/ubuntu/js_code/the_odin_js/JS_Advance/nodejs/inventory-app/views/orders/index.ejs || echo "Clean: zero matches"
+Clean: zero matches

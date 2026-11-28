@@ -1,0 +1,47 @@
+docker exec -i inventory_postgres psql -U my_user -d inventory_db -c "
+ALTER TABLE public.items
+  ADD COLUMN IF NOT EXISTS is_weekend_special BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS weekend_discount_pct NUMERIC(5, 2) NOT NULL DEFAULT 0;
+"
+ALTER TABLE
+
+
+
+Flag a test food item (such as Kunafa, item_id = 14) as a weekend special (for example, 10% off on weekends):
+docker exec -i inventory_postgres psql -U my_user -d inventory_db -c "
+UPDATE public.items
+SET is_weekend_special = TRUE, weekend_discount_pct = 10.00
+WHERE id = 14;
+"
+UPDATE 1
+
+crash nodemon by running so for see which file crash for reason 
+node --check /home/ubuntu/js_code/the_odin_js/JS_Advance/nodejs/inventory-app/models/orderModel.js
+node --check /home/ubuntu/js_code/the_odin_js/JS_Advance/nodejs/inventory-app/controllers/orderController.js
+Verification: Both node --check commands exit with status 0 and print nothing.
+
+Make sure VALID_ORDER_TYPES and VALID_ORDER_CHANNELS exist in models/orderModel.js
+const VALID_ORDER_TYPES = new Set(["WALK_IN", "TAKEAWAY", "ONLINE"]);
+const VALID_ORDER_CHANNELS = new Set(["ZOMATO", "SWIGGY", "DIRECT_WEB"]);
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+
+ grep -nE 'id="(punch-order-btn|quick-pay-btn|estimated-total)"' /home/ubuntu/js_code/the_odin_js/JS_Advance/nodejs/inventory-app/views/orders/index.ejs
+145:          <button type="submit" id="punch-order-btn" class="btn-primary">Punch Order</button>
+151:          <button type="button" id="quick-pay-btn" class="btn-primary">Quick Payment</button>
+154:          Discount: <strong id="estimated-discount">$0.00</strong> · Net Subtotal: <strong id="estimated-total">$0.00</strong>
+160:          <button type="submit" id="punch-order-btn" class="btn-primary">Punch Order</button>
+166:          <button type="button" id="quick-pay-btn" class="btn-primary">Quick Payment</button>
+169:          Estimated Subtotal: <strong id="estimated-total">$0.00</strong>
+ubuntu@ubuntu-HP-Laptop:~/js_code/the_odin_js/JS_Advance/nodejs/inventory-app$ docker exec -i inventory_postgres psql -U my_user -d inventory_db -c "
+SELECT id, order_type, table_number, discount_type, discount_value, discount_amount, subtotal_amount, total_amount
+FROM public.orders
+ORDER BY id DESC
+LIMIT 3;
+"
+ id | order_type | table_number | discount_type | discount_value | discount_amount | subtotal_amount | total_amount 
+----+------------+--------------+---------------+----------------+-----------------+-----------------+--------------
+ 49 | WALK_IN    | 5            |               |           0.00 |            5.20 |           41.80 |        41.80
+ 48 | TAKEAWAY   |              |               |           0.00 |            2.06 |           18.54 |        18.54
+ 47 | TAKEAWAY   |              |               |           0.00 |            0.00 |            0.00 |         2.00
+(3 rows)

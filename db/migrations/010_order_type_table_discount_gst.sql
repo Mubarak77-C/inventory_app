@@ -17,3 +17,5 @@ ALTER TABLE public.order_items
   ADD COLUMN IF NOT EXISTS taxable_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5, 2) NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS gst_amount NUMERIC(12, 2) NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_orders_order_type ON public.orders (order_type);

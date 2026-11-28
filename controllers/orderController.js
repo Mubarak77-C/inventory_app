@@ -13,6 +13,9 @@ const {
   ReconciliationError,
 } = require("../models/paymentModel");
 const { listCustomers } = require("../models/customerModel");
+const ALLOWED_ORDER_TYPES = new Set(["WALK_IN", "TAKEAWAY", "ONLINE"]);
+const ALLOWED_ORDER_CHANNELS = new Set(["ZOMATO", "SWIGGY", "DIRECT_WEB"]);
+
 const pool = require("../db/pool");
 
 function extractIdempotencyKey(req) {
@@ -64,7 +67,13 @@ async function punchOrder(req, res, next) {
     const createdBy =
       req.session?.userId ?? req.session?.user?.id ?? req.user?.id ?? null;
     const customerId = req.body?.customerId ?? req.body?.customer_id ?? null;
-
+    const orderContext = normalizeOrderContext(req.body);
+    if (orderContext.orderType === "WALK_IN" && !orderContext.tableNumber) {
+      return res.status(400).json({
+        code: "TABLE_NUMBER_REQUIRED",
+        error: "Table number is required for Walk-in orders.",
+      });
+    }
     const result = await createOrder({
       idempotencyKey,
       items,
@@ -74,6 +83,9 @@ async function punchOrder(req, res, next) {
       paymentReference:
         req.body?.paymentReference ?? req.body?.payment_reference,
       customerId,
+      orderType: orderContext.orderType,
+      tableNumber: orderContext.tableNumber,
+      orderChannel: orderContext.orderChannel,
     });
 
     const httpStatus = result.idempotentReplay ? 200 : 201;
@@ -100,7 +112,6 @@ async function punchOrder(req, res, next) {
     return next(err);
   }
 }
-
 async function updateOrderStatus(req, res, next) {
   try {
     const { id } = req.params;
@@ -276,6 +287,36 @@ async function getOrderInvoice(req, res, next) {
     return next(err);
   }
 }
+
+function normalizeOrderContext(body = {}) {
+  const rawType = String(body.orderType ?? body.order_type ?? "WALK_IN")
+    .trim()
+    .toUpperCase();
+  const orderType = ALLOWED_ORDER_TYPES.has(rawType) ? rawType : "WALK_IN";
+
+  const rawTable = String(body.tableNumber ?? body.table_number ?? "").trim();
+  const rawChannel = String(body.orderChannel ?? body.order_channel ?? "")
+    .trim()
+    .toUpperCase();
+
+  if (orderType === "WALK_IN") {
+    return {
+      orderType: "WALK_IN",
+      tableNumber: rawTable || null,
+      orderChannel: null,
+    };
+  }
+
+  // TAKEAWAY or ONLINE orders never retain a dine-in table number
+  return {
+    orderType,
+    tableNumber: null,
+    orderChannel:
+      orderType === "ONLINE" && ALLOWED_ORDER_CHANNELS.has(rawChannel)
+        ? rawChannel
+        : null,
+  };
+}
 module.exports = {
   punchOrder,
   getOrders,
@@ -285,4 +326,5 @@ module.exports = {
   createPaymentIntent,
   postReconcilePayment,
   getOrderInvoice,
+  normalizeOrderContext,
 };

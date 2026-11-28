@@ -21,6 +21,9 @@ const ALLOWED_TRANSITIONS = {
   CANCELLED: new Set([]),
 };
 
+const VALID_ORDER_TYPES = new Set(["WALK_IN", "TAKEAWAY", "ONLINE"]);
+const VALID_ORDER_CHANNELS = new Set(["ZOMATO", "SWIGGY", "DIRECT_WEB"]);
+
 function createDomainError(message, code, statusCode = 400, meta = {}) {
   const err = new Error(message);
   err.code = code;
@@ -114,6 +117,7 @@ async function getOrderWithItemsById(clientOrPool, orderId) {
  * Atomically creates an order, snapshots item name & price, deducts items.stock_count,
  * and writes the initial PENDING entry to order_status_history.
  */
+
 async function createOrder({
   idempotencyKey,
   items,
@@ -122,6 +126,9 @@ async function createOrder({
   paymentMethod = null,
   paymentReference = null,
   customerId = null,
+  orderType = "WALK_IN",
+  tableNumber = null,
+  orderChannel = null,
 }) {
   if (
     typeof idempotencyKey !== "string" ||
@@ -144,6 +151,40 @@ async function createOrder({
       400,
     );
   }
+
+  const rawOrderType =
+    typeof orderType === "string" && orderType.trim().length > 0
+      ? orderType.trim().toUpperCase()
+      : "WALK_IN";
+  const normalizedOrderType = VALID_ORDER_TYPES.has(rawOrderType)
+    ? rawOrderType
+    : "WALK_IN";
+
+  const cleanTableNumber =
+    normalizedOrderType === "WALK_IN" &&
+    typeof tableNumber === "string" &&
+    tableNumber.trim().length > 0
+      ? tableNumber.trim().slice(0, 30)
+      : null;
+
+  if (normalizedOrderType === "WALK_IN" && !cleanTableNumber) {
+    throw createDomainError(
+      "Table number is required for Walk-in orders.",
+      "TABLE_NUMBER_REQUIRED",
+      400,
+    );
+  }
+
+  const rawOrderChannel =
+    typeof orderChannel === "string" && orderChannel.trim().length > 0
+      ? orderChannel.trim().toUpperCase()
+      : null;
+  const cleanOrderChannel =
+    normalizedOrderType === "ONLINE" &&
+    rawOrderChannel &&
+    VALID_ORDER_CHANNELS.has(rawOrderChannel)
+      ? rawOrderChannel
+      : null;
 
   let normalizedPaymentMethod = null;
   let cleanPaymentReference = null;
@@ -273,7 +314,7 @@ async function createOrder({
       });
     }
 
-    // 3. Insert order header (with PAID fields when quick-paid & optional customer_id)
+    // 3. Insert order header (with PAID fields, optional customer_id, and order type/table/channel)
     const isPaid = normalizedStatus === "COMPLETED";
     const orderInsertRes = await client.query(
       `INSERT INTO public.orders (
@@ -285,9 +326,12 @@ async function createOrder({
          payment_reference,
          paid_at,
          created_by,
-         customer_id
+         customer_id,
+         order_type,
+         table_number,
+         order_channel
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         cleanKey,
@@ -299,6 +343,9 @@ async function createOrder({
         isPaid ? new Date() : null,
         actorId,
         resolvedCustomerId,
+        normalizedOrderType,
+        cleanTableNumber,
+        cleanOrderChannel,
       ],
     );
     const createdOrder = orderInsertRes.rows[0];
@@ -367,7 +414,6 @@ async function createOrder({
     client.release();
   }
 }
-
 async function listOrders(limit = 50) {
   const parsedLimit = Number(limit);
   const safeLimit =
@@ -394,6 +440,9 @@ async function listOrders(limit = 50) {
        c.address_line2 AS customer_address_line2,
        c.extra_details AS customer_extra_details,
        o.created_at,
+       o.order_type,
+o.table_number,
+o.order_channel,
        COALESCE(
          json_agg(
            json_build_object(

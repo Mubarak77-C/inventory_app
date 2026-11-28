@@ -47,7 +47,7 @@
       <div class="row" style="margin-bottom: 1rem;">
         <label for="customer-select">
           <strong>Customer:</strong>
-          <select id="customer-select" name="customerId" style="min-width: 260px;">
+          <select id="customer-select" name="customerId" style="min-width: 240px;">
             <option value="">Walk-in Guest (No Customer)</option>
             <% (customers || []).forEach((cust) => { %>
               <option value="<%= cust.id %>">
@@ -57,32 +57,32 @@
           </select>
         </label>
         <button type="button" id="open-customer-modal" title="Add New Customer">+ Add Customer</button>
+
+        <label for="order-type-select">
+          <strong>Customer Type:</strong>
+          <select id="order-type-select" name="orderType">
+            <option value="WALK_IN">Walk-in (Dine-in)</option>
+            <option value="TAKEAWAY">TakeAway (Parcel)</option>
+            <option value="ONLINE">Online (Zomato / Swiggy)</option>
+          </select>
+        </label>
+
+        <label id="table-number-field" for="table-number-input">
+          <strong>Table No.:</strong>
+          <input type="text" id="table-number-input" name="tableNumber" placeholder="e.g. T1 or 4" style="width: 120px;" required />
+        </label>
+
+        <label id="online-channel-field" for="online-channel-select" style="display: none;">
+          <strong>Platform:</strong>
+          <select id="online-channel-select" name="orderChannel">
+            <option value="">Select Platform</option>
+            <option value="ZOMATO">Zomato</option>
+            <option value="SWIGGY">Swiggy</option>
+            <option value="DIRECT_WEB">Other / Direct</option>
+          </select>
+        </label>
       </div>
-      <div class="row" style="margin-bottom: 1rem;">
-  <label for="order-type-select">
-    <strong>Order / Customer Type:</strong>
-    <select id="order-type-select" name="orderType">
-      <option value="WALK_IN">Walk-in (Dine-in)</option>
-      <option value="TAKEAWAY">TakeAway (Parcel)</option>
-      <option value="ONLINE">Online (Zomato / Swiggy / etc.)</option>
-    </select>
-  </label>
 
-  <label id="table-number-field" for="table-number-input">
-    <strong>Table Number:</strong>
-    <input type="text" id="table-number-input" name="tableNumber" placeholder="e.g. T1, Table 4" style="width: 130px;" />
-  </label>
-
-  <label id="online-channel-field" for="online-channel-select" style="display: none;">
-    <strong>Platform:</strong>
-    <select id="online-channel-select" name="orderChannel">
-      <option value="">Select / Optional</option>
-      <option value="ZOMATO">Zomato</option>
-      <option value="SWIGGY">Swiggy</option>
-      <option value="DIRECT_WEB">Direct / Other</option>
-    </select>
-  </label>
-</div>
       <div id="line-items">
         <div class="row line-item">
           <label>
@@ -200,6 +200,14 @@
                 <% } else { %>
                   <span class="muted-dash">Walk-in Guest</span>
                 <% } %>
+                <span class="cust-sub">
+                  Type: <strong><%= order.order_type || "WALK_IN" %></strong>
+                  <% if ((order.order_type || "WALK_IN") === "WALK_IN" && order.table_number) { %>
+                    · Table: <strong><%= order.table_number %></strong>
+                  <% } else if (order.order_type === "ONLINE" && order.order_channel) { %>
+                    · <%= order.order_channel %>
+                  <% } %>
+                </span>
               </td>
               <td>
                 <span class="badge badge-<%= st %>"><%= st %></span>
@@ -385,10 +393,35 @@
     const customerModalFeedback = document.getElementById("customer-modal-feedback");
 
     const orderTypeSelect = document.getElementById("order-type-select");
-const tableNumberField = document.getElementById("table-number-field");
-const tableNumberInput = document.getElementById("table-number-input");
-const onlineChannelField = document.getElementById("online-channel-field");
-const onlineChannelInput = document.getElementById("online-channel-select");
+    const tableNumberField = document.getElementById("table-number-field");
+    const tableNumberInput = document.getElementById("table-number-input");
+    const onlineChannelField = document.getElementById("online-channel-field");
+    const onlineChannelSelect = document.getElementById("online-channel-select");
+
+    function syncOrderTypeFields() {
+      const selectedType = orderTypeSelect ? orderTypeSelect.value : "WALK_IN";
+      const isWalkIn = selectedType === "WALK_IN";
+      const isOnline = selectedType === "ONLINE";
+
+      if (tableNumberField) {
+        tableNumberField.style.display = isWalkIn ? "" : "none";
+      }
+      if (tableNumberInput) {
+        tableNumberInput.required = isWalkIn;
+        if (!isWalkIn) tableNumberInput.value = "";
+      }
+      if (onlineChannelField) {
+        onlineChannelField.style.display = isOnline ? "" : "none";
+      }
+      if (!isOnline && onlineChannelSelect) {
+        onlineChannelSelect.value = "";
+      }
+    }
+
+    if (orderTypeSelect) {
+      orderTypeSelect.addEventListener("change", syncOrderTypeFields);
+      syncOrderTypeFields();
+    }
 
     function openCustomerModal() {
       customerModalFeedback.innerHTML = "";
@@ -426,7 +459,14 @@ const onlineChannelInput = document.getElementById("online-channel-select");
         });
         const data = await res.json();
         if (!res.ok) {
-          customerModalFeedback.innerHTML = `<div class="msg-err">${data.error || "Failed to save customer."}</div>`; return; }  const c = data.customer; const opt = document.createElement("option"); opt.value = c.id; opt.textContent = `#${c.id} — ${c.name}${c.phone ? " (" + c.phone + ")" : ""}`;
+          customerModalFeedback.innerHTML = `<div class="msg-err">${data.error || "Failed to save customer."}</div>`;
+          return;
+        }
+
+        const c = data.customer;
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = `#${c.id} — ${c.name}${c.phone ? " (" + c.phone + ")" : ""}`;
         customerSelect.appendChild(opt);
         customerSelect.value = String(c.id);
         closeCustomerModal();
@@ -508,12 +548,24 @@ const onlineChannelInput = document.getElementById("online-channel-select");
 
       const customerId =
         customerSelect && customerSelect.value ? Number(customerSelect.value) : null;
+      const orderType = orderTypeSelect ? orderTypeSelect.value : "WALK_IN";
+      const tableNumber =
+        orderType === "WALK_IN" && tableNumberInput
+          ? tableNumberInput.value.trim() || null
+          : null;
+      const orderChannel =
+        orderType === "ONLINE" && onlineChannelSelect
+          ? onlineChannelSelect.value || null
+          : null;
 
       const bodyPayload = {
         idempotencyKey: currentIdempotencyKey,
         items,
         status: targetStatus,
         customerId,
+        orderType,
+        tableNumber,
+        orderChannel,
       };
       if (paymentMethod) {
         bodyPayload.paymentMethod = paymentMethod;
@@ -533,10 +585,18 @@ const onlineChannelInput = document.getElementById("online-channel-select");
         const data = await res.json();
 
         if (!res.ok) {
-          feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Order failed."}</div>`; return; }  currentIdempotencyKey = createKey(); const paidTag = data.order.payment_status === "PAID" ? ` · PAID (${data.order.payment_method})`
+          feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Order failed."}</div>`;
+          return;
+        }
+
+        currentIdempotencyKey = createKey();
+        const paidTag =
+          data.order.payment_status === "PAID"
+            ? ` · PAID (${data.order.payment_method})`
             : "";
-        feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} created (${data.order.status}${paidTag}) — Total:$${Number(data.order.total_amount).toFixed(2)}</div>`;
+        feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} created (${data.order.status}${paidTag}) — Total: $${Number(data.order.total_amount).toFixed(2)}</div>`;
         form.reset();
+        syncOrderTypeFields();
         recalcSubtotal();
         setTimeout(() => {
           window.location.href = "/orders?_=" + Date.now();
@@ -556,7 +616,6 @@ const onlineChannelInput = document.getElementById("online-channel-select");
       await submitOrder("COMPLETED", quickPaySelect.value);
     });
 
-    // --- Edit Order Panel Logic ---
     function buildEditRow(selectedItemId = "", qty = 1) {
       const div = document.createElement("div");
       div.className = "row edit-line-item";
@@ -565,7 +624,7 @@ const onlineChannelInput = document.getElementById("online-channel-select");
       for (const cat of CATALOG_DATA) {
         const sel = Number(cat.id) === Number(selectedItemId) ? "selected" : "";
         options.push(
-          `<option value="${cat.id}" data-price="${Number(cat.price)}" ${sel}>#${cat.id} — ${cat.name} ($${Number(cat.price).toFixed(2)} | Stock:${cat.stock_count})</option>`
+          `<option value="${cat.id}" data-price="${Number(cat.price)}" ${sel}>#${cat.id} — ${cat.name} ($${Number(cat.price).toFixed(2)} | Stock: ${cat.stock_count})</option>`
         );
       }
 
@@ -607,7 +666,60 @@ const onlineChannelInput = document.getElementById("online-channel-select");
         if (!targetOrder) return;
 
         editOrderIdInput.value = String(orderId);
-        editTitle.textContent = `#${orderId} (${targetOrder.status})`; editReasonInput.value = ""; editLineItemsContainer.innerHTML = "";  const lines = Array.isArray(targetOrder.items) && targetOrder.items.length > 0 ? targetOrder.items : [{}];  for (const line of lines) { editLineItemsContainer.appendChild(buildEditRow(line.item_id ?? "", line.quantity ?? 1)); }  recalcEditSubtotal(); editPanel.style.display = "block"; editPanel.scrollIntoView({ behavior: "smooth", block: "nearest" }); }); });  editAddRowBtn.addEventListener("click", () => { editLineItemsContainer.appendChild(buildEditRow("", 1)); recalcEditSubtotal(); });  cancelEditBtn.addEventListener("click", () => { editPanel.style.display = "none"; editLineItemsContainer.innerHTML = ""; });  editLineItemsContainer.addEventListener("input", recalcEditSubtotal); editLineItemsContainer.addEventListener("change", recalcEditSubtotal); editLineItemsContainer.addEventListener("click", (e) => { if (e.target.classList.contains("edit-remove-row")) { const rows = editLineItemsContainer.querySelectorAll(".edit-line-item"); if (rows.length > 1) { e.target.closest(".edit-line-item").remove(); recalcEditSubtotal(); } } });  editForm.addEventListener("submit", async (e) => { e.preventDefault(); feedback.innerHTML = "";  const orderId = editOrderIdInput.value; const items = Array.from(editLineItemsContainer.querySelectorAll(".edit-line-item")).map((row) => ({ itemId: Number(row.querySelector(".edit-item-select").value), quantity: Number(row.querySelector(".edit-qty-input").value), }));  const reason = editReasonInput.value.trim();  try { const res = await fetch(`/orders/${orderId}/items`, {
+        editTitle.textContent = `#${orderId} (${targetOrder.status})`;
+        editReasonInput.value = "";
+        editLineItemsContainer.innerHTML = "";
+
+        const lines = Array.isArray(targetOrder.items) && targetOrder.items.length > 0
+          ? targetOrder.items
+          : [{}];
+
+        for (const line of lines) {
+          editLineItemsContainer.appendChild(buildEditRow(line.item_id ?? "", line.quantity ?? 1));
+        }
+
+        recalcEditSubtotal();
+        editPanel.style.display = "block";
+        editPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    });
+
+    editAddRowBtn.addEventListener("click", () => {
+      editLineItemsContainer.appendChild(buildEditRow("", 1));
+      recalcEditSubtotal();
+    });
+
+    cancelEditBtn.addEventListener("click", () => {
+      editPanel.style.display = "none";
+      editLineItemsContainer.innerHTML = "";
+    });
+
+    editLineItemsContainer.addEventListener("input", recalcEditSubtotal);
+    editLineItemsContainer.addEventListener("change", recalcEditSubtotal);
+    editLineItemsContainer.addEventListener("click", (e) => {
+      if (e.target.classList.contains("edit-remove-row")) {
+        const rows = editLineItemsContainer.querySelectorAll(".edit-line-item");
+        if (rows.length > 1) {
+          e.target.closest(".edit-line-item").remove();
+          recalcEditSubtotal();
+        }
+      }
+    });
+
+    editForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      feedback.innerHTML = "";
+
+      const orderId = editOrderIdInput.value;
+      const items = Array.from(editLineItemsContainer.querySelectorAll(".edit-line-item")).map((row) => ({
+        itemId: Number(row.querySelector(".edit-item-select").value),
+        quantity: Number(row.querySelector(".edit-qty-input").value),
+      }));
+
+      const reason = editReasonInput.value.trim();
+
+      try {
+        const res = await fetch(`/orders/${orderId}/items`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -626,7 +738,7 @@ const onlineChannelInput = document.getElementById("online-channel-select");
           return;
         }
 
-        feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} updated — New Total:$${Number(data.order.total_amount).toFixed(2)}.</div>`;
+        feedback.innerHTML = `<div class="msg-ok">Order #${data.order.id} updated — New Total: $${Number(data.order.total_amount).toFixed(2)}.</div>`;
         setTimeout(() => {
           window.location.href = "/orders?_=" + Date.now();
         }, 350);
@@ -670,7 +782,14 @@ const onlineChannelInput = document.getElementById("online-channel-select");
           const data = await res.json();
 
           if (!res.ok) {
-            feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Status update failed."}</div>`; btn.disabled = false; return; }  const restockNote = Array.isArray(data.restoredItems) && data.restoredItems.length > 0 ? ` (Restocked ${data.restoredItems.length} item line(s))`
+            feedback.innerHTML = `<div class="msg-err"><strong>${data.code || "Error"}:</strong> ${data.error || "Status update failed."}</div>`;
+            btn.disabled = false;
+            return;
+          }
+
+          const restockNote =
+            Array.isArray(data.restoredItems) && data.restoredItems.length > 0
+              ? ` (Restocked ${data.restoredItems.length} item line(s))`
               : "";
           const paidNote =
             nextStatus === "COMPLETED" && data.order?.payment_method
@@ -697,26 +816,6 @@ const onlineChannelInput = document.getElementById("online-channel-select");
       }).format(dt);
       el.title = `UTC: ${iso}`;
     });
-
-    function syncOrderTypeFields() {
-  const type = orderTypeSelect.value;
-  const isWalkIn = type === "WALK_IN";
-  const isOnline = type === "ONLINE";
-
-  tableNumberField.style.display = isWalkIn ? "" : "none";
-  tableNumberInput.required = isWalkIn;
-  if (!isWalkIn) {
-    tableNumberInput.value = "";
-  }
-
-  onlineChannelField.style.display = isOnline ? "" : "none";
-  if (!isOnline) {
-    onlineChannelInput.value = "";
-  }
-}
-
-orderTypeSelect.addEventListener("change", syncOrderTypeFields);
-syncOrderTypeFields();
 
     recalcSubtotal();
   </script>
